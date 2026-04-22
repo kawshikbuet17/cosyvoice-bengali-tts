@@ -1,0 +1,18 @@
+{
+  "duration": 4.83,
+  "speaker_id": "01700000001",
+  "gender": "নারী",
+  "script_source": "dummy documentation sample",
+  "path": "Female/01700000001/2024-05-09/sample_female_001.flac",
+  "speech_id": "sample_female_001",
+  "annotation": [
+    {
+      "tagList": [],
+      "start": 0.0,
+      "end": 4.83,
+      "id": "sample-annotation-3",
+      "sentence": "আমি বাংলা ভাষায় স্বাভাবিক ও পরিষ্কারভাবে কথা বলতে চাই।",
+      "words": []
+    }
+  ]
+}

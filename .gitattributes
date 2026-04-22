@@ -1,0 +1,27 @@
+# Keep executable/script files Linux-friendly when moving between Windows and Linux.
+*.sh text eol=lf
+*.py text eol=lf
+
+# Keep common documentation and config files normalized.
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.scp text eol=lf
+
+# Do not apply text line-ending conversion to binary/model/audio artifacts.
+*.pt binary
+*.pth binary
+*.onnx binary
+*.wav binary
+*.flac binary
+*.parquet binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary

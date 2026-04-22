@@ -1,0 +1,18 @@
+{
+  "duration": 7.12,
+  "speaker_id": "01700000002",
+  "gender": "নারী",
+  "script_source": "dummy documentation sample",
+  "path": "Female/01700000002/2024-05-10/sample_female_002.flac",
+  "speech_id": "sample_female_002",
+  "annotation": [
+    {
+      "tagList": [],
+      "start": 0.0,
+      "end": 7.12,
+      "id": "sample-annotation-4",
+      "sentence": "প্রযুক্তির সাহায্যে মানুষের কাজ আরও সহজ এবং দ্রুত হয়ে যাচ্ছে।",
+      "words": []
+    }
+  ]
+}

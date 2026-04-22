@@ -1,0 +1,91 @@
+﻿{
+    "duration": 6.66,
+    "speaker_id": "01332512906",
+    "gender": "পুরুষ",
+    "script_source": "manually curated",
+    "path": "gold/create/sentence+word/01332512906/2024-05-07/00d4da35-bebc-471b-aa92-0d9398388e98.flac",
+    "speech_id": "00d4da35-bebc-471b-aa92-0d9398388e98",
+    "annotation": [
+        {
+            "tagList": [],
+            "start": 1.07355922,
+            "end": 6.08486152,
+            "id": "rPboUgsw",
+            "sentence": "তার কথাগুলো শুনে বুঝলাম  বয়সের তুলনায় সে মানসিকতায় অনেক বড় হয়ে গিয়েছে।",
+            "words": [
+                {
+                    "start": 1.17355922,
+                    "end": 1.43355922,
+                    "id": "rPboUgsw-1",
+                    "word": "তার"
+                },
+                {
+                    "start": 1.43355922,
+                    "end": 1.99355922,
+                    "id": "rPboUgsw-2",
+                    "word": "কথাগুলো"
+                },
+                {
+                    "start": 1.99355922,
+                    "end": 2.25355922,
+                    "id": "rPboUgsw-3",
+                    "word": "শুনে"
+                },
+                {
+                    "start": 2.25355922,
+                    "end": 2.79355922,
+                    "id": "rPboUgsw-4",
+                    "word": "বুঝলাম"
+                },
+                {
+                    "start": 2.79355922,
+                    "end": 3.31355922,
+                    "id": "rPboUgsw-5",
+                    "word": "বয়সের"
+                },
+                {
+                    "start": 3.31355922,
+                    "end": 3.75355922,
+                    "id": "rPboUgsw-6",
+                    "word": "তুলনায়"
+                },
+                {
+                    "start": 3.75355922,
+                    "end": 3.95355922,
+                    "id": "rPboUgsw-7",
+                    "word": "সে"
+                },
+                {
+                    "start": 3.95355922,
+                    "end": 4.71355922,
+                    "id": "rPboUgsw-8",
+                    "word": "মানসিকতায়"
+                },
+                {
+                    "start": 4.71355922,
+                    "end": 5.03355922,
+                    "id": "rPboUgsw-9",
+                    "word": "অনেক"
+                },
+                {
+                    "start": 5.03355922,
+                    "end": 5.31355922,
+                    "id": "rPboUgsw-10",
+                    "word": "বড়"
+                },
+                {
+                    "start": 5.31355922,
+                    "end": 5.53355922,
+                    "id": "rPboUgsw-11",
+                    "word": "হয়ে"
+                },
+                {
+                    "start": 5.53355922,
+                    "end": 6.04355922,
+                    "id": "rPboUgsw-12",
+                    "word": "গিয়েছে"
+                }
+            ]
+        }
+    ]
+}

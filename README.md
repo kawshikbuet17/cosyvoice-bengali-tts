@@ -1,3 +1,16 @@
+## CosyVoice Bengali TTS Fork
+
+This fork adapts FunAudioLLM/CosyVoice for Bengali TTS experiments. It adds a CosyVoice3-focused Bengali data preparation and training scaffold where the input is raw Bengali `.flac` audio with matching `.json` metadata, and the output is CosyVoice metadata/parquet training data plus a path toward Bengali speech synthesis.
+
+Start here:
+
+- [TTS_CosyVoice_Beginner_Guide.md](docs/TTS_CosyVoice_Beginner_Guide.md)
+- [TTS_CosyVoice_Bengali_Implementation_Guide.md](docs/TTS_CosyVoice_Bengali_Implementation_Guide.md)
+- [Major_Changes_From_Original_CosyVoice.md](docs/Major_Changes_From_Original_CosyVoice.md)
+
+The original upstream README continues below. For Bengali-specific work, use this fork and the documents linked above; upstream clone/install examples are kept as original CosyVoice reference material.
+
+---
 ![SVG Banners](https://svg-banners.vercel.app/api?type=origin&text1=CosyVoice🤠&text2=Text-to-Speech%20💖%20Large%20Language%20Model&width=800&height=210)
 
 ## 👉🏻 CosyVoice 👈🏻
@@ -262,3 +275,4 @@ You can also scan the QR code to join our official Dingding chat group.
 
 ## Disclaimer
 The content provided above is for academic purposes only and is intended to demonstrate technical capabilities. Some examples are sourced from the internet. If any content infringes on your rights, please contact us to request its removal.
+

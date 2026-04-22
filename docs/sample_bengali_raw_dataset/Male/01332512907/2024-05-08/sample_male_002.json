@@ -1,0 +1,18 @@
+{
+  "duration": 5.21,
+  "speaker_id": "01332512907",
+  "gender": "পুরুষ",
+  "script_source": "dummy documentation sample",
+  "path": "Male/01332512907/2024-05-08/sample_male_002.flac",
+  "speech_id": "sample_male_002",
+  "annotation": [
+    {
+      "tagList": [],
+      "start": 0.0,
+      "end": 5.21,
+      "id": "sample-annotation-2",
+      "sentence": "আজকের আবহাওয়া বেশ সুন্দর এবং চারদিকে আলো ঝলমল করছে।",
+      "words": []
+    }
+  ]
+}
