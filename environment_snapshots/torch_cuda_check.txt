@@ -1,0 +1,6 @@
+torch: 2.3.1+cu121
+torchaudio: 2.3.1+cu121
+cuda_available: True
+cuda_version: 12.1
+device_count: 2
+device_0: NVIDIA GeForce RTX 5090

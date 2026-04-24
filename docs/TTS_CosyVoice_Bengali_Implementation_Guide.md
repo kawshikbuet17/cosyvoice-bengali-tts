@@ -401,13 +401,17 @@ docs/
     README.md
 ```
 
-Optional later additions:
+Recommended tracked addition:
 
 ```text
 environment_snapshots/
+  README.md
+  conda_list_server_working.txt
   requirements_server_working.txt
+  python_version.txt
+  nvidia_smi_server_working.txt
   torch_cuda_check.txt
-  gpu_info.txt
+  system_info.txt
 ```
 
 ## 8. Files Modified
