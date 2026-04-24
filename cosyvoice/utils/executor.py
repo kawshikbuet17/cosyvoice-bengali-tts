@@ -172,5 +172,9 @@ class Executor:
             total_loss_dict[k] = sum(v) / total_num_utts
         info_dict['loss_dict'] = total_loss_dict
         log_per_save(writer, info_dict)
-        model_name = 'epoch_{}_whole'.format(self.epoch) if on_batch_end else 'epoch_{}_step_{}'.format(self.epoch, self.step + 1)
-        save_model(model, model_name, info_dict)
+        # Only save checkpoint every save_interval_epochs epochs (or on final epoch)
+        save_interval = info_dict.get('save_interval_epochs', 1)
+        max_epoch = info_dict.get('max_epoch', 200)
+        if self.epoch % save_interval == 0 or self.epoch == max_epoch - 1:
+            model_name = 'epoch_{}_whole'.format(self.epoch) if on_batch_end else 'epoch_{}_step_{}'.format(self.epoch, self.step + 1)
+            save_model(model, model_name, info_dict)

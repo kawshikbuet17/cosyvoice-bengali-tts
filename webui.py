@@ -1,4 +1,4 @@
-# Copyright (c) 2024 Alibaba Inc (authors: Xiang Lyu, Liu Yue)
+﻿# Copyright (c) 2024 Alibaba Inc (authors: Xiang Lyu, Liu Yue)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,13 +26,80 @@ from cosyvoice.cli.cosyvoice import AutoModel
 from cosyvoice.utils.file_utils import logging
 from cosyvoice.utils.common import set_all_random_seed
 
-inference_mode_list = ['预训练音色', '3s极速复刻', '跨语种复刻', '自然语言控制']
-instruct_dict = {'预训练音色': '1. 选择预训练音色\n2. 点击生成音频按钮',
-                 '3s极速复刻': '1. 选择prompt音频文件，或录入prompt音频，注意不超过30s，若同时提供，优先选择prompt音频文件\n2. 输入prompt文本\n3. 点击生成音频按钮',
-                 '跨语种复刻': '1. 选择prompt音频文件，或录入prompt音频，注意不超过30s，若同时提供，优先选择prompt音频文件\n2. 点击生成音频按钮',
-                 '自然语言控制': '1. 选择预训练音色\n2. 输入instruct文本\n3. 点击生成音频按钮'}
-stream_mode_list = [('否', False), ('是', True)]
+MODE_SFT = 'Pretrained voice / প্রিট্রেইনড ভয়েস'
+MODE_ZERO_SHOT = 'Zero-shot voice clone / জিরো-শট ভয়েস ক্লোন'
+MODE_CROSS_LINGUAL = 'Cross-lingual voice clone / ক্রস-লিঙ্গুয়াল ভয়েস ক্লোন'
+MODE_INSTRUCT = 'Instruction control / নির্দেশনা নিয়ন্ত্রণ'
+
+inference_mode_list = [MODE_CROSS_LINGUAL, MODE_ZERO_SHOT, MODE_SFT, MODE_INSTRUCT]
+instruct_dict = {
+    MODE_SFT: (
+        'English:\n'
+        '1. Select a pretrained speaker/voice if available.\n'
+        '2. Enter the text to synthesize.\n'
+        '3. Click Generate Audio.\n\n'
+        'বাংলা:\n'
+        '১. প্রিট্রেইনড স্পিকার/ভয়েস থাকলে নির্বাচন করুন।\n'
+        '২. যে লেখা থেকে অডিও বানাতে চান সেটি লিখুন।\n'
+        '৩. Generate Audio বাটনে ক্লিক করুন।'
+    ),
+    MODE_ZERO_SHOT: (
+        'English:\n'
+        '1. Enter the Bengali text to synthesize.\n'
+        '2. Upload or record a short prompt audio, preferably under 30 seconds.\n'
+        '3. Enter the exact transcript of the prompt audio in Prompt Text.\n'
+        '   Example: I am happy today.<|endofprompt|> or just the transcript without prefix.\n'
+        '4. Click Generate Audio.\n\n'
+        'বাংলা:\n'
+        '১. যে বাংলা বাক্য দিয়ে অডিও বানাতে চান সেটি লিখুন।\n'
+        '২. ৩০ সেকেন্ডের কম একটি ছোট prompt audio আপলোড বা রেকর্ড করুন।\n'
+        '৩. prompt audio-তে যা বলা হয়েছে তার সঠিক transcript Prompt Text-এ লিখুন।\n'
+        '   উদাহরণ: I am happy today.<|endofprompt|> অথবা শুধু transcript।\n'
+        '৪. Generate Audio বাটনে ক্লিক করুন।'
+    ),
+    MODE_CROSS_LINGUAL: (
+        'English:\n'
+        '1. Enter the target text to synthesize. Bengali text is supported for testing.\n'
+        '   Example: You are a helpful assistant.<|endofprompt|>আজকের আবহাওয়া খুব সুন্দর।\n'
+        '2. Upload or record prompt audio for the reference voice.\n'
+        '3. Prompt Text is not required for this mode.\n'
+        '4. Click Generate Audio.\n\n'
+        'বাংলা:\n'
+        '১. যে টেক্সট থেকে অডিও বানাতে চান সেটি লিখুন। বাংলা টেক্সট দিয়ে পরীক্ষা করা যাবে।\n'
+        '   উদাহরণ: You are a helpful assistant.<|endofprompt|>আজকের আবহাওয়া খুব সুন্দর।\n'
+        '২. রেফারেন্স ভয়েসের জন্য prompt audio আপলোড বা রেকর্ড করুন।\n'
+        '৩. এই মোডে Prompt Text বাধ্যতামূলক নয়।\n'
+        '৪. Generate Audio বাটনে ক্লিক করুন।'
+    ),
+    MODE_INSTRUCT: (
+        'English:\n'
+        '1. Select a pretrained speaker/voice if available.\n'
+        '2. Enter an instruction such as speaking style or emotion.\n'
+        '   Example: Speak with a happy tone.<|endofprompt|>\n'
+        '3. Enter the text to synthesize.\n'
+        '4. Click Generate Audio.\n\n'
+        'বাংলা:\n'
+        '১. প্রিট্রেইনড স্পিকার/ভয়েস থাকলে নির্বাচন করুন।\n'
+        '২. কথা বলার স্টাইল বা emotion নির্দেশনা হিসেবে লিখুন।\n'
+        '   উদাহরণ: Speak with a happy tone.<|endofprompt|>\n'
+        '৩. যে লেখা থেকে অডিও বানাতে চান সেটি লিখুন।\n'
+        '৪. Generate Audio বাটনে ক্লিক করুন।'
+    )
+}
+stream_mode_list = [('No / না', False), ('Yes / হ্যাঁ', True)]
+COSYVOICE3_SYSTEM_PROMPT = 'You are a helpful assistant.<|endofprompt|>'
 max_val = 0.8
+
+
+def uses_cosyvoice3():
+    return 'cosyvoice3' in args.model_dir.lower()
+
+
+def ensure_cosyvoice3_prefix(text):
+    text = text.strip()
+    if '<|endofprompt|>' in text:
+        return text
+    return COSYVOICE3_SYSTEM_PROMPT + text
 
 
 def generate_seed():
@@ -55,55 +122,86 @@ def generate_audio(tts_text, mode_checkbox_group, sft_dropdown, prompt_text, pro
         prompt_wav = prompt_wav_record
     else:
         prompt_wav = None
-    # if instruct mode, please make sure that model is iic/CosyVoice-300M-Instruct and not cross_lingual mode
-    if mode_checkbox_group in ['自然语言控制']:
-        if instruct_text == '':
-            gr.Warning('您正在使用自然语言控制模式, 请输入instruct文本')
-            yield (cosyvoice.sample_rate, default_data)
-        if prompt_wav is not None or prompt_text != '':
-            gr.Info('您正在使用自然语言控制模式, prompt音频/prompt文本会被忽略')
-    # if cross_lingual mode, please make sure that model is iic/CosyVoice-300M and tts_text prompt_text are different language
-    if mode_checkbox_group in ['跨语种复刻']:
-        if instruct_text != '':
-            gr.Info('您正在使用跨语种复刻模式, instruct文本会被忽略')
-        if prompt_wav is None:
-            gr.Warning('您正在使用跨语种复刻模式, 请提供prompt音频')
-            yield (cosyvoice.sample_rate, default_data)
-        gr.Info('您正在使用跨语种复刻模式, 请确保合成文本和prompt文本为不同语言')
-    # if in zero_shot cross_lingual, please make sure that prompt_text and prompt_wav meets requirements
-    if mode_checkbox_group in ['3s极速复刻', '跨语种复刻']:
-        if prompt_wav is None:
-            gr.Warning('prompt音频为空，您是否忘记输入prompt音频？')
-            yield (cosyvoice.sample_rate, default_data)
-        if torchaudio.info(prompt_wav).sample_rate < prompt_sr:
-            gr.Warning('prompt音频采样率{}低于{}'.format(torchaudio.info(prompt_wav).sample_rate, prompt_sr))
-            yield (cosyvoice.sample_rate, default_data)
-    # sft mode only use sft_dropdown
-    if mode_checkbox_group in ['预训练音色']:
-        if instruct_text != '' or prompt_wav is not None or prompt_text != '':
-            gr.Info('您正在使用预训练音色模式，prompt文本/prompt音频/instruct文本会被忽略！')
-        if sft_dropdown == '':
-            gr.Warning('没有可用的预训练音色！')
-            yield (cosyvoice.sample_rate, default_data)
-    # zero_shot mode only use prompt_wav prompt text
-    if mode_checkbox_group in ['3s极速复刻']:
-        if prompt_text == '':
-            gr.Warning('prompt文本为空，您是否忘记输入prompt文本？')
-            yield (cosyvoice.sample_rate, default_data)
-        if instruct_text != '':
-            gr.Info('您正在使用3s极速复刻模式，预训练音色/instruct文本会被忽略！')
 
-    if mode_checkbox_group == '预训练音色':
+    # Resample prompt audio to 16kHz if needed
+    if prompt_wav is not None:
+        try:
+            info = torchaudio.info(prompt_wav)
+            if info.sample_rate != prompt_sr:
+                logging.info(f'Resampling prompt audio from {info.sample_rate} Hz to {prompt_sr} Hz')
+                waveform, sr = torchaudio.load(prompt_wav)
+                resampler = torchaudio.transforms.Resample(orig_freq=sr, new_freq=prompt_sr)
+                waveform = resampler(waveform)
+                # Save to temp file
+                temp_path = prompt_wav + '.resampled.wav'
+                torchaudio.save(temp_path, waveform, prompt_sr)
+                prompt_wav = temp_path
+        except Exception as e:
+            logging.warning(f'Failed to resample prompt audio: {e}')
+
+    if mode_checkbox_group == MODE_INSTRUCT:
+        if instruct_text == '':
+            gr.Warning('Instruction mode needs instruction text. / নির্দেশনা মোডে instruct text প্রয়োজন।')
+            yield (cosyvoice.sample_rate, default_data)
+            return
+        if prompt_wav is not None or prompt_text != '':
+            gr.Info('Instruction mode ignores prompt audio and prompt text. / নির্দেশনা মোডে prompt audio ও prompt text ব্যবহার হবে না।')
+
+    if mode_checkbox_group == MODE_CROSS_LINGUAL:
+        if instruct_text != '':
+            gr.Info('Cross-lingual mode ignores instruction text. / Cross-lingual মোডে instruct text ব্যবহার হবে না।')
+        if prompt_wav is None:
+            gr.Warning('Cross-lingual mode needs prompt audio. / Cross-lingual মোডে prompt audio প্রয়োজন।')
+            yield (cosyvoice.sample_rate, default_data)
+            return
+        gr.Info('Cross-lingual mode uses prompt audio as the reference voice. / Cross-lingual মোডে prompt audio রেফারেন্স ভয়েস হিসেবে ব্যবহৃত হয়।')
+
+    if mode_checkbox_group in [MODE_ZERO_SHOT, MODE_CROSS_LINGUAL]:
+        if prompt_wav is None:
+            gr.Warning('Prompt audio is empty. / Prompt audio দেওয়া হয়নি।')
+            yield (cosyvoice.sample_rate, default_data)
+            return
+        if torchaudio.info(prompt_wav).sample_rate < prompt_sr:
+            gr.Warning('Prompt audio sample rate {} is lower than {}. / Prompt audio sample rate {} থেকে কম।'.format(
+                torchaudio.info(prompt_wav).sample_rate, prompt_sr, prompt_sr))
+            yield (cosyvoice.sample_rate, default_data)
+            return
+
+    if mode_checkbox_group == MODE_SFT:
+        if instruct_text != '' or prompt_wav is not None or prompt_text != '':
+            gr.Info('Pretrained voice mode ignores prompt/instruction fields. / প্রিট্রেইনড ভয়েস মোডে prompt/instruction ব্যবহার হবে না।')
+        if sft_dropdown == '':
+            gr.Warning('No pretrained speaker is available. / কোনো প্রিট্রেইনড speaker পাওয়া যায়নি।')
+            yield (cosyvoice.sample_rate, default_data)
+            return
+
+    if mode_checkbox_group == MODE_ZERO_SHOT:
+        if prompt_text == '':
+            gr.Warning('Zero-shot mode needs prompt text matching the prompt audio. / Zero-shot মোডে prompt audio-এর transcript প্রয়োজন।')
+            yield (cosyvoice.sample_rate, default_data)
+            return
+        if instruct_text != '':
+            gr.Info('Zero-shot mode ignores pretrained voice and instruction text. / Zero-shot মোডে pretrained voice ও instruction ব্যবহার হবে না।')
+
+    if uses_cosyvoice3():
+        if mode_checkbox_group == MODE_ZERO_SHOT:
+            prompt_text = ensure_cosyvoice3_prefix(prompt_text)
+        elif mode_checkbox_group == MODE_CROSS_LINGUAL:
+            tts_text = ensure_cosyvoice3_prefix(tts_text)
+        elif mode_checkbox_group == MODE_INSTRUCT:
+            instruct_text = ensure_cosyvoice3_prefix(instruct_text)
+
+    if mode_checkbox_group == MODE_SFT:
         logging.info('get sft inference request')
         set_all_random_seed(seed)
         for i in cosyvoice.inference_sft(tts_text, sft_dropdown, stream=stream, speed=speed):
             yield (cosyvoice.sample_rate, i['tts_speech'].numpy().flatten())
-    elif mode_checkbox_group == '3s极速复刻':
+    elif mode_checkbox_group == MODE_ZERO_SHOT:
         logging.info('get zero_shot inference request')
         set_all_random_seed(seed)
         for i in cosyvoice.inference_zero_shot(tts_text, prompt_text, prompt_wav, stream=stream, speed=speed):
             yield (cosyvoice.sample_rate, i['tts_speech'].numpy().flatten())
-    elif mode_checkbox_group == '跨语种复刻':
+    elif mode_checkbox_group == MODE_CROSS_LINGUAL:
         logging.info('get cross_lingual inference request')
         set_all_random_seed(seed)
         for i in cosyvoice.inference_cross_lingual(tts_text, prompt_wav, stream=stream, speed=speed):
@@ -111,38 +209,120 @@ def generate_audio(tts_text, mode_checkbox_group, sft_dropdown, prompt_text, pro
     else:
         logging.info('get instruct inference request')
         set_all_random_seed(seed)
-        for i in cosyvoice.inference_instruct(tts_text, sft_dropdown, instruct_text, stream=stream, speed=speed):
+        for i in cosyvoice.inference_instruct2(tts_text, instruct_text, prompt_wav, stream=stream, speed=speed):
             yield (cosyvoice.sample_rate, i['tts_speech'].numpy().flatten())
 
 
 def main():
-    with gr.Blocks() as demo:
-        gr.Markdown("### 代码库 [CosyVoice](https://github.com/FunAudioLLM/CosyVoice) \
-                    预训练模型 [CosyVoice-300M](https://www.modelscope.cn/models/iic/CosyVoice-300M) \
-                    [CosyVoice-300M-Instruct](https://www.modelscope.cn/models/iic/CosyVoice-300M-Instruct) \
-                    [CosyVoice-300M-SFT](https://www.modelscope.cn/models/iic/CosyVoice-300M-SFT)")
-        gr.Markdown("#### 请输入需要合成的文本，选择推理模式，并按照提示步骤进行操作")
+    with gr.Blocks(title='CosyVoice Bengali TTS / কজি ভয়েস বাংলা TTS') as demo:
+        gr.Markdown(
+            """
+            # CosyVoice Bengali TTS Demo / কজি ভয়েস বাংলা TTS ডেমো
 
-        tts_text = gr.Textbox(label="输入合成文本", lines=1, value="我是通义实验室语音团队全新推出的生成式语音大模型，提供舒适自然的语音合成能力。")
+            **What this page does / এই পেজটি কী করে:**  
+            This page generates Bengali speech from written Bengali text using a CosyVoice model.  
+            এই পেজটি CosyVoice মডেল ব্যবহার করে বাংলা লেখা থেকে বাংলা ভয়েস অডিও তৈরি করে।
+
+            **Input and output / ইনপুট ও আউটপুট:**  
+            Input is Bengali text, plus optional prompt audio/text for voice cloning. Output is generated `.wav` speech audio.  
+            ইনপুট হলো বাংলা টেক্সট, এবং voice cloning-এর জন্য প্রয়োজন হলে prompt audio/text। আউটপুট হলো তৈরি হওয়া `.wav` অডিও।
+
+            **Why prompt audio is used / Prompt audio কেন লাগে:**  
+            In zero-shot or cross-lingual mode, prompt audio tells the model which speaker voice/style to imitate.  
+            Zero-shot বা cross-lingual মোডে prompt audio মডেলকে কোন speaker-এর voice/style অনুসরণ করতে হবে তা জানায়।
+            """
+        )
+        gr.Markdown(
+            """
+            **Quick example / সহজ উদাহরণ:**
+            - Text to synthesize / যে লেখা থেকে অডিও বানাবেন: `আজকের সকালটা খুব শান্ত ছিল। নদীর পাশে হালকা বাতাস বইছিল।`
+            - Prompt audio / Prompt audio: a short clear recording from the target speaker, preferably under 30 seconds.
+            - Prompt text / Prompt text: exact transcript of the prompt audio, for example `আমি আজ খুব ভালো আছি।`
+            - Then click **Generate Audio / অডিও তৈরি করুন**.
+
+            **Recommended for testing / পরীক্ষার জন্য সুপারিশ:**
+            - Use **Zero-shot voice clone / জিরো-শট ভয়েস ক্লোন** when you have a short prompt audio and its transcript.
+            - Use **Cross-lingual voice clone / ক্রস-লিঙ্গুয়াল ভয়েস ক্লোন** when you only want to provide a reference voice audio.
+            - Use **Pretrained voice / প্রিট্রেইনড ভয়েস** only if the model folder provides selectable pretrained speakers.
+            """
+        )
+
+        tts_text = gr.Textbox(
+            label="Text to synthesize / যে টেক্সট থেকে অডিও বানাবেন",
+            lines=2,
+            value="আজকের সকালটা খুব শান্ত ছিল। নদীর পাশে হালকা বাতাস বইছিল।"
+        )
         with gr.Row():
-            mode_checkbox_group = gr.Radio(choices=inference_mode_list, label='选择推理模式', value=inference_mode_list[0])
-            instruction_text = gr.Text(label="操作步骤", value=instruct_dict[inference_mode_list[0]], scale=0.5)
-            sft_dropdown = gr.Dropdown(choices=sft_spk, label='选择预训练音色', value=sft_spk[0], scale=0.25)
-            stream = gr.Radio(choices=stream_mode_list, label='是否流式推理', value=stream_mode_list[0][1])
-            speed = gr.Number(value=1, label="速度调节(仅支持非流式推理)", minimum=0.5, maximum=2.0, step=0.1)
+            mode_checkbox_group = gr.Radio(
+                choices=inference_mode_list,
+                label='Inference mode / ইনফারেন্স মোড',
+                value=MODE_CROSS_LINGUAL
+            )
+            instruction_text = gr.Text(
+                label="Step-by-step instructions / ধাপে ধাপে নির্দেশনা",
+                value=instruct_dict[MODE_CROSS_LINGUAL],
+                scale=0.5
+            )
+            sft_dropdown = gr.Dropdown(
+                choices=sft_spk,
+                label='Pretrained speaker / প্রিট্রেইনড স্পিকার',
+                value=sft_spk[0],
+                scale=0.25
+            )
+            stream = gr.Radio(
+                choices=stream_mode_list,
+                label='Streaming inference / স্ট্রিমিং ইনফারেন্স',
+                value=stream_mode_list[0][1]
+            )
+            speed = gr.Number(
+                value=1,
+                label="Speed / গতি",
+                minimum=0.5,
+                maximum=2.0,
+                step=0.1
+            )
             with gr.Column(scale=0.25):
-                seed_button = gr.Button(value="\U0001F3B2")
-                seed = gr.Number(value=0, label="随机推理种子")
+                seed_button = gr.Button(value="Random seed / র‍্যান্ডম সিড")
+                seed = gr.Number(value=0, label="Seed / সিড")
 
         with gr.Row():
-            prompt_wav_upload = gr.Audio(sources='upload', type='filepath', label='选择prompt音频文件，注意采样率不低于16khz')
-            prompt_wav_record = gr.Audio(sources='microphone', type='filepath', label='录制prompt音频文件')
-        prompt_text = gr.Textbox(label="输入prompt文本", lines=1, placeholder="请输入prompt文本，需与prompt音频内容一致，暂时不支持自动识别...", value='')
-        instruct_text = gr.Textbox(label="输入instruct文本", lines=1, placeholder="请输入instruct文本.", value='')
+            prompt_wav_upload = gr.Audio(
+                sources='upload',
+                type='filepath',
+                label='Upload prompt audio, at least 16 kHz / Prompt audio আপলোড করুন, কমপক্ষে 16 kHz'
+            )
+            prompt_wav_record = gr.Audio(
+                sources='microphone',
+                type='filepath',
+                label='Record prompt audio / Prompt audio রেকর্ড করুন'
+            )
+        prompt_text = gr.Textbox(
+            label="Prompt text transcript / Prompt audio-এর transcript",
+            lines=2,
+            placeholder="Write exactly what is spoken in the prompt audio. / Prompt audio-তে যা বলা হয়েছে ঠিক সেটি লিখুন।",
+            value=''
+        )
+        instruct_text = gr.Textbox(
+            label="Instruction text / নির্দেশনা টেক্সট",
+            lines=2,
+            placeholder="Example: Speak calmly and clearly. / উদাহরণ: শান্তভাবে এবং পরিষ্কারভাবে বলুন।",
+            value=''
+        )
 
-        generate_button = gr.Button("生成音频")
+        generate_button = gr.Button("Generate Audio / অডিও তৈরি করুন")
 
-        audio_output = gr.Audio(label="合成音频", autoplay=True, streaming=True)
+        audio_output = gr.Audio(label="Generated audio / তৈরি অডিও", autoplay=True, streaming=True)
+
+        gr.Markdown(
+            """
+            ---
+            **Prepared by / প্রস্তুত করেছেন:**  
+            Kawshik Kumar Paul  
+            Software Engineer | Researcher  
+            Department of Computer Science and Engineering (CSE), BUET  
+            **Email:** kawshikbuet17@gmail.com
+            """
+        )
 
         seed_button.click(generate_seed, inputs=[], outputs=seed)
         generate_button.click(generate_audio,
@@ -172,3 +352,4 @@ if __name__ == '__main__':
     prompt_sr = 16000
     default_data = np.zeros(cosyvoice.sample_rate)
     main()
+

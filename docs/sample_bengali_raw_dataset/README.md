@@ -1,4 +1,4 @@
-﻿# Sample Bengali Raw Dataset Layout
+# Sample Bengali Raw Dataset Layout
 
 This folder shows the expected raw dataset structure for the Bengali CosyVoice3 preparation script.
 
@@ -58,6 +58,28 @@ annotation[*]["sentence"]
 ```
 
 The words list contains word-level timing metadata. The current CosyVoice3 preparation script does not train from word timings, but the full structure is kept in the example because it exists in the real dataset and is useful for future alignment, quality checks, or forced-alignment work.
+### Which fields are actually used in the current Bengali pipeline
+
+Required or effectively required:
+
+- a matching real `.flac` audio file;
+- a matching `.json` metadata file;
+- transcript text from `annotation[*]["sentence"]`;
+- `speaker_id`, or a speaker identity that can be inferred from the folder path.
+
+Used when present:
+
+- `path` to help resolve the real audio location;
+- `duration` for min/max duration filtering;
+- `speech_id` for stable utterance naming;
+- `gender` for metadata/reporting, not as a direct training control.
+
+Not used yet as a first-pass training signal:
+
+- `script_source`;
+- sentence-level `start`, `end`, and `id`;
+- `tagList`;
+- word-level timing fields inside `words`.
 
 ```json
 {
@@ -161,5 +183,3 @@ Software Engineer | Researcher
 Department of Computer Science and Engineering (CSE)  
 Bangladesh University of Engineering and Technology (BUET)  
 **Email:** kawshikbuet17@gmail.com  
-
-

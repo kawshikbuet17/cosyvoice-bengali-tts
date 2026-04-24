@@ -38,6 +38,7 @@ train_engine=torch_ddp
 dist_backend=nccl
 job_id=1986
 models="llm"
+checkpoint=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -69,6 +70,7 @@ while [ $# -gt 0 ]; do
     --dist_backend) dist_backend="$2"; shift 2 ;;
     --job_id) job_id="$2"; shift 2 ;;
     --models) models="$2"; shift 2 ;;
+    --checkpoint) checkpoint="$2"; shift 2 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -158,6 +160,13 @@ if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
   echo "Stage 5: Train CosyVoice3 Bengali model(s): ${models}"
   num_gpus=$(echo "${CUDA_VISIBLE_DEVICES}" | awk -F "," '{print NF}')
   for model in ${models}; do
+    # Use provided checkpoint, otherwise fall back to pretrained model
+    if [ -n "${checkpoint}" ]; then
+      checkpoint_path="${checkpoint}"
+    else
+      checkpoint_path="${pretrained_model_dir}/${model}.pt"
+    fi
+    echo "Using checkpoint: ${checkpoint_path}"
     torchrun --nnodes=1 --nproc_per_node="${num_gpus}" \
       --rdzv_id="${job_id}" --rdzv_backend="c10d" --rdzv_endpoint="localhost:1234" \
       ../../../cosyvoice/bin/train.py \
@@ -168,7 +177,7 @@ if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
       --qwen_pretrain_path "${pretrained_model_dir}/CosyVoice-BlankEN" \
       --onnx_path "${pretrained_model_dir}" \
       --model "${model}" \
-      --checkpoint "${pretrained_model_dir}/${model}.pt" \
+      --checkpoint "${checkpoint_path}" \
       --model_dir "$(pwd)/exp/cosyvoice3_bengali/${model}/${train_engine}" \
       --tensorboard_dir "$(pwd)/tensorboard/cosyvoice3_bengali/${model}/${train_engine}" \
       --ddp.dist_backend "${dist_backend}" \

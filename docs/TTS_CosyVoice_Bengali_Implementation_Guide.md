@@ -331,6 +331,34 @@ Example JSON shape with sentence text and word-level timing:
 }
 ```
 
+### Which raw Bengali dataset fields are actually used now
+
+The current Bengali preparation script uses the raw dataset conservatively.
+
+Required or effectively required:
+
+- one real `.flac` audio file;
+- one matching `.json` file;
+- transcript text from `annotation[*]["sentence"]`;
+- `speaker_id`, or a folder path from which the speaker ID can be inferred.
+
+Used when present:
+
+- `path`: helps resolve the correct `.flac` file if simple same-folder or same-stem matching is not enough;
+- `duration`: used for duration filtering against `--min-duration` and `--max-duration`;
+- `speech_id`: used when building stable utterance IDs;
+- `gender`: retained in the prepared record/report, but not used to control training.
+
+Currently not used for first-pass training decisions:
+
+- `script_source`;
+- `annotation[*].tagList`;
+- `annotation[*].start` and `annotation[*].end`;
+- `annotation[*].id`;
+- `annotation[*].words[*]` word-level timing metadata.
+
+So the first Bengali CosyVoice3 baseline mainly depends on clean audio-text pairing and correct speaker identity. Richer JSON fields are preserved for future alignment or dataset-quality work, but they are not the main drivers of the current training pipeline.
+
 ## 6. Sample Dummy Dataset
 
 A documentation-only sample raw dataset is included at:
@@ -384,24 +412,38 @@ environment_snapshots/
 
 ## 8. Files Modified
 
-The first implementation avoids broad modification.
+The implementation still follows the original CosyVoice structure, but several practical changes were added after real remote-server execution.
 
-Current minimal modification:
+Current modified files and purpose:
 
 - `README.md`
-  Add a short note that this fork is being adapted for Bengali CosyVoice3 TTS and point to the docs.
+  Add a short note that this fork is adapted for Bengali CosyVoice3 TTS and point users to the Bengali documentation.
+
+- `.gitattributes`
+  Force Linux-friendly LF line endings for shell/Python/config/docs files. This prevents server errors such as `python3\r` after moving files from Windows to Linux.
+
+- `examples/bengali/cosyvoice3/run.sh`
+  Add the Bengali staged runner, dataset arguments, `--speaker_ids`, GPU selection through `--cuda_visible_devices`, and `--checkpoint` support for resuming training from a selected checkpoint.
+
+- `examples/bengali/cosyvoice3/conf/cosyvoice3_bengali.yaml`
+  Add the Bengali CosyVoice3 training config. The config now includes `save_interval_epochs: 10` so future training does not save a huge checkpoint every epoch.
+
+- `examples/bengali/cosyvoice3/local/prepare_bengali_data.py`
+  Convert the raw Bengali `.flac` + `.json` dataset into CosyVoice metadata files.
+
+- `examples/bengali/cosyvoice3/local/infer_bengali.py`
+  Add terminal inference for Bengali testing. It supports `zero_shot`, `cross_lingual`, and `instruct2`, and now automatically inserts the CosyVoice3 `<|endofprompt|>` system separator when needed.
+
+- `cosyvoice/utils/executor.py`
+  Add checkpoint save interval support through `save_interval_epochs` to reduce disk usage during long training.
+
+- `webui.py`
+  Add an English/Bangla Gradio UI, Bengali usage instructions, a prepared-by footer, and CosyVoice3 prompt-prefix handling for inference.
 
 - `docs/`
-  Add Bengali-specific guides and sample dataset documentation.
+  Add Bengali-specific beginner, implementation, major-change, and sample-dataset documentation.
 
-The first Bengali implementation did not change core files under:
-
-```text
-cosyvoice/
-tools/
-```
-
-unless a real compatibility issue is discovered.
+Core model architecture is not broadly refactored. The changes are limited to a Bengali adaptation path, running scripts, inference helpers, checkpoint practicality, and documentation.
 
 ## 9. Bengali Dataset Preparation Design
 
@@ -768,6 +810,13 @@ For long remote runs, first read **Section 16: Running Long Jobs With tmux**. Th
 
 The staged runner exports `CUDA_VISIBLE_DEVICES` before any stage starts. Therefore `--cuda_visible_devices 1` is intended to apply to speaker embedding extraction, speech token extraction, parquet generation, and training, not only Stage 5.
 
+Important naming note:
+
+- `run.sh` uses runner-style arguments such as `--speaker_id` and `--speaker_ids`;
+- `prepare_bengali_data.py` uses Python-script arguments such as `--speaker-id` and `--speaker-ids`.
+
+Both are correct in their own context.
+
 From repo root:
 
 ```bash
@@ -1011,6 +1060,60 @@ checkpoints are saved
 TensorBoard logs are written
 ```
 
+
+#### 10.1 Checkpoint Storage And Save Frequency
+
+A real training run showed that CosyVoice3 LLM checkpoints are large:
+
+```text
+epoch_*_whole.pt ~= 1.9 GB each
+```
+
+Saving every epoch can quickly consume hundreds of GB. One run reached:
+
+```text
+data/        19G
+exp/         200G
+tensorboard/ 12M
+```
+
+and the root filesystem became full:
+
+```text
+/dev/sda5  2.7T total, 2.6T used, 371M available, 100% used
+```
+
+The training then failed while saving a checkpoint.
+
+To reduce future storage usage, the Bengali config uses:
+
+```yaml
+save_interval_epochs: 10
+```
+
+and `cosyvoice/utils/executor.py` only saves whole checkpoints every `save_interval_epochs` epochs. With the current setting, future training should save roughly every 10 epochs instead of every epoch.
+
+#### 10.2 Resume Training From A Checkpoint
+
+The staged runner supports `--checkpoint`.
+
+Example resume from epoch 104:
+
+```bash
+cd ~/cosyvoice-bengali-tts/examples/bengali/cosyvoice3
+
+bash run.sh \
+  --stage 5 \
+  --stop_stage 5 \
+  --dataset_root /home/kawshik/TTS_Dataset \
+  --min_utterances_per_speaker 200 \
+  --pretrained_model_dir ../../../pretrained_models/Fun-CosyVoice3-0.5B \
+  --checkpoint exp/cosyvoice3_bengali/llm/torch_ddp/epoch_104_whole.pt \
+  --cuda_visible_devices 1
+```
+
+Use this only after enough disk space is available.
+
 ### Step 11: Monitor With TensorBoard
 
 ```bash
@@ -1049,52 +1152,28 @@ The script keeps text_frontend disabled by default.
 
 Reason: the current CosyVoice frontend is mainly designed around Chinese/English normalization. For Bengali, the safer first baseline is to preserve Bangla Unicode text and pass it directly to the CosyVoice3 tokenizer.
 
-#### 12.1 Test Inference With The Original Pretrained CosyVoice3 Model
+#### 12.1 Current Verified Inference Status
 
-Run this before testing a fine-tuned checkpoint.
-
-From repo root:
-
-```bash
-cd examples/bengali/cosyvoice3
-```
-
-Zero-shot Bengali inference:
-
-```bash
-python local/infer_bengali.py \
-  --model-dir ../../../pretrained_models/Fun-CosyVoice3-0.5B \
-  --mode zero_shot \
-  --text "তার কথাগুলো শুনে বুঝলাম বয়সের তুলনায় সে মানসিকতায় অনেক বড় হয়ে গিয়েছে।" \
-  --prompt-wav ../../../asset/zero_shot_prompt.wav \
-  --prompt-text "You are a helpful assistant.<|endofprompt|>এই অডিওর কথাটি এখানে লিখুন।" \
-  --output-dir outputs/bengali_inference \
-  --output-prefix pretrained_bn_test
-```
-
-Replace `--prompt-wav` and `--prompt-text` with a real Bengali prompt audio and its transcript when available.
-
-Instruct-style Bengali inference:
-
-```bash
-python local/infer_bengali.py \
-  --model-dir ../../../pretrained_models/Fun-CosyVoice3-0.5B \
-  --mode instruct2 \
-  --text "আমি বাংলা ভাষায় স্বাভাবিক ও পরিষ্কারভাবে কথা বলতে চাই।" \
-  --prompt-wav ../../../asset/zero_shot_prompt.wav \
-  --instruct-text "You are a helpful assistant. Please speak in Bengali.<|endofprompt|>" \
-  --output-dir outputs/bengali_inference \
-  --output-prefix pretrained_bn_instruct
-```
-
-Expected output:
+The verified working inference path after the first Bengali LLM fine-tuning run is:
 
 ```text
-outputs/bengali_inference/pretrained_bn_test_zero_shot_0.wav
-outputs/bengali_inference/pretrained_bn_instruct_instruct2_0.wav
+fine-tuned epoch_104 checkpoint
+  -> exported clean llm.pt
+  -> complete CosyVoice3 model folder
+  -> cross_lingual inference
+  -> valid Bengali wav output
 ```
 
-#### 12.2 Prepare A Fine-Tuned Bengali Model Directory
+The current observation is:
+
+```text
+cross_lingual mode works well and generated a valid ~9 second Bengali output.
+zero_shot mode is not yet the preferred path because it is sensitive to exact prompt-text alignment and produced a broken/0-second output during testing.
+```
+
+For now, use **cross-lingual mode** as the recommended Bengali inference path.
+
+#### 12.2 Prepare A Clean Fine-Tuned Model Directory
 
 CosyVoice inference expects a complete model directory containing files such as:
 
@@ -1108,62 +1187,334 @@ speech_tokenizer_v3.onnx
 CosyVoice-BlankEN/
 ```
 
-After Bengali LLM fine-tuning, the first practical approach is:
+Training checkpoints such as:
 
 ```text
-copy the original pretrained model directory
-replace only llm.pt with the fine-tuned Bengali llm checkpoint
-keep flow.pt and hift.pt from the original pretrained model
+examples/bengali/cosyvoice3/exp/cosyvoice3_bengali/llm/torch_ddp/epoch_104_whole.pt
+```
+
+are **training checkpoints**, not clean inference `llm.pt` files.
+
+Meaning `epoch_104_whole.pt` contains:
+
+```text
+model weights
++ epoch
++ step
+```
+
+But `webui.py` and `AutoModel` expect `llm.pt` to contain only model weights. If `epoch` and `step` are still present, inference loading can fail with an error like:
+
+```text
+Unexpected key(s) in state_dict: "epoch", "step".
+```
+
+Create a clean inference model folder like this from repo root:
+
+```bash
+cd ~/cosyvoice-bengali-tts
+
+rm -rf pretrained_models/Fun-CosyVoice3-0.5B-bengali-epoch104
+mkdir -p pretrained_models/Fun-CosyVoice3-0.5B-bengali-epoch104
+
+for f in pretrained_models/Fun-CosyVoice3-0.5B/*; do
+  ln -s "$(realpath "$f")" "pretrained_models/Fun-CosyVoice3-0.5B-bengali-epoch104/$(basename "$f")"
+done
+
+rm -f pretrained_models/Fun-CosyVoice3-0.5B-bengali-epoch104/llm.pt
+```
+
+Then export a clean `llm.pt` by removing `epoch` and `step`:
+
+```bash
+python - <<'PY'
+import torch
+from pathlib import Path
+
+src = Path("examples/bengali/cosyvoice3/exp/cosyvoice3_bengali/llm/torch_ddp/epoch_104_whole.pt")
+dst = Path("pretrained_models/Fun-CosyVoice3-0.5B-bengali-epoch104/llm.pt")
+
+ckpt = torch.load(src, map_location="cpu")
+if not isinstance(ckpt, dict):
+    raise RuntimeError("Checkpoint is not a dict")
+epoch = ckpt.pop("epoch", None)
+step = ckpt.pop("step", None)
+torch.save(ckpt, dst)
+print("saved clean llm.pt")
+print("removed epoch:", epoch)
+print("removed step:", step)
+print("output:", dst)
+PY
+```
+
+Verify the clean file:
+
+```bash
+python - <<'PY'
+import torch
+path = "pretrained_models/Fun-CosyVoice3-0.5B-bengali-epoch104/llm.pt"
+ckpt = torch.load(path, map_location="cpu")
+print("loaded clean llm.pt")
+print("has epoch:", "epoch" in ckpt)
+print("has step:", "step" in ckpt)
+print("num keys:", len(ckpt))
+PY
+```
+
+Expected:
+
+```text
+has epoch: False
+has step: False
+```
+
+#### 12.3 Terminal Inference, Recommended Cross-Lingual Mode
+
+Run from repo root:
+
+```bash
+cd ~/cosyvoice-bengali-tts
+```
+
+Use this as the current recommended inference command:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python examples/bengali/cosyvoice3/local/infer_bengali.py \
+  --model-dir pretrained_models/Fun-CosyVoice3-0.5B-bengali-epoch104 \
+  --mode cross_lingual \
+  --text "You are a Bengali text-to-speech assistant. Speak clearly and naturally.<|endofprompt|>আজ বিকেলে আকাশটা মেঘলা ছিল, কিন্তু ঠান্ডা বাতাসে হাঁটতে খুব ভালো লাগছিল।" \
+  --prompt-wav ./asset/kawshik_prompt.wav \
+  --output-dir inference_test/output_cross
+```
+
+Check the output:
+
+```bash
+ls -lh inference_test/output_cross
+ffprobe -hide_banner inference_test/output_cross/*.wav
+```
+
+Expected result:
+
+```text
+A real wav file with non-zero duration.
+During testing, cross_lingual generated a valid ~9 second output.
+```
+
+In cross-lingual mode:
+
+```text
+--text       = instruction + <|endofprompt|> + Bengali sentence to synthesize
+--prompt-wav = reference voice/style audio
+--prompt-text is not used
+```
+
+The prompt WAV can be Bengali or another language. The model uses it as the reference voice/style.
+
+#### 12.4 Useful CosyVoice3 Instruction Prompts
+
+The text before `<|endofprompt|>` is the CosyVoice3 instruction/system prompt.
+
+Good options to try:
+
+```text
+You are a helpful assistant.<|endofprompt|>
+```
+
+```text
+You are a Bengali text-to-speech assistant. Speak clearly and naturally.<|endofprompt|>
+```
+
+```text
+You are a Bangla voice assistant. Read the text in natural Bengali pronunciation.<|endofprompt|>
+```
+
+```text
+You are a professional Bengali narrator. Speak calmly and clearly.<|endofprompt|>
+```
+
+```text
+You are a Bengali conversational speaker. Speak naturally, like everyday conversation.<|endofprompt|>
 ```
 
 Example:
 
 ```bash
-cd examples/bengali/cosyvoice3
-
-cp -r ../../../pretrained_models/Fun-CosyVoice3-0.5B \
-  ../../../pretrained_models/Fun-CosyVoice3-0.5B-Bengali-LLM
-
-cp exp/cosyvoice3_bengali/llm/torch_ddp/llm.pt \
-  ../../../pretrained_models/Fun-CosyVoice3-0.5B-Bengali-LLM/llm.pt
+CUDA_VISIBLE_DEVICES=1 python examples/bengali/cosyvoice3/local/infer_bengali.py \
+  --model-dir pretrained_models/Fun-CosyVoice3-0.5B-bengali-epoch104 \
+  --mode cross_lingual \
+  --text "You are a professional Bengali narrator. Speak calmly and clearly.<|endofprompt|>আজকের সকালটা খুব শান্ত ছিল। নদীর পাশে হালকা বাতাস বইছিল।" \
+  --prompt-wav ./asset/kawshik_prompt.wav \
+  --output-dir inference_test/output_cross_narrator
 ```
 
-If the final checkpoint has a different filename, change the source path accordingly.
+#### 12.5 Zero-Shot Mode And Prompt Text
 
-#### 12.3 Run Inference With The Fine-Tuned Bengali LLM
-
-```bash
-python local/infer_bengali.py \
-  --model-dir ../../../pretrained_models/Fun-CosyVoice3-0.5B-Bengali-LLM \
-  --mode zero_shot \
-  --text "প্রযুক্তির সাহায্যে মানুষের কাজ আরও সহজ এবং দ্রুত হয়ে যাচ্ছে।" \
-  --prompt-wav /home/kawshik/bengali_prompt.wav \
-  --prompt-text "You are a helpful assistant.<|endofprompt|>প্রম্পট অডিওতে যে বাংলা কথা বলা হয়েছে সেটি এখানে লিখুন।" \
-  --output-dir outputs/bengali_inference \
-  --output-prefix bengali_finetuned
-```
-
-Expected output:
+Zero-shot mode uses both:
 
 ```text
-outputs/bengali_inference/bengali_finetuned_zero_shot_0.wav
+--prompt-wav
+--prompt-text
 ```
 
-#### 12.4 Cross-Lingual Mode
+Definitions:
 
-Cross-lingual mode uses prompt audio without a prompt transcript.
+```text
+Prompt WAV  = short audio recording of the reference speaker
+Prompt text = exact transcript of what is spoken inside that prompt WAV
+```
+
+Example:
+
+```text
+If ./asset/kawshik_prompt.wav says:
+এটা একটা নমুনা ভয়েস। আমি আজকে খুব ভালো আছি।
+
+Then --prompt-text should be:
+এটা একটা নমুনা ভয়েস। আমি আজকে খুব ভালো আছি।
+```
+
+CosyVoice3 also needs a separator token:
+
+```text
+You are a helpful assistant.<|endofprompt|>
+```
+
+The updated `infer_bengali.py` automatically adds that prefix for CosyVoice3 if it is missing. A manual full command is:
 
 ```bash
-python local/infer_bengali.py \
-  --model-dir ../../../pretrained_models/Fun-CosyVoice3-0.5B-Bengali-LLM \
-  --mode cross_lingual \
-  --text "You are a helpful assistant.<|endofprompt|>আজকের আবহাওয়া বেশ সুন্দর এবং চারদিকে আলো ঝলমল করছে।" \
-  --prompt-wav /home/kawshik/bengali_prompt.wav \
-  --output-dir outputs/bengali_inference \
-  --output-prefix bengali_cross_lingual
+CUDA_VISIBLE_DEVICES=1 python examples/bengali/cosyvoice3/local/infer_bengali.py \
+  --model-dir pretrained_models/Fun-CosyVoice3-0.5B-bengali-epoch104 \
+  --mode zero_shot \
+  --text "আজকের সকালটা খুব শান্ত ছিল। নদীর পাশে হালকা বাতাস বইছিল।" \
+  --prompt-wav ./asset/kawshik_prompt.wav \
+  --prompt-text "You are a helpful assistant.<|endofprompt|>এটা একটা নমুনা ভয়েস। আমি আজকে খুব ভালো আছি।" \
+  --output-dir inference_test/output_zero_shot
 ```
 
-#### 12.5 When To Use `--text-frontend`
+Current finding:
+
+```text
+zero_shot reached the model but was not the best current path.
+A broken/0-second output was observed during testing.
+cross_lingual gave a valid output and is recommended for the current checkpoint.
+```
+
+#### 12.6 Gradio Web UI On Port 6007
+
+The Gradio UI is useful for sharing an audio-output endpoint with others.
+
+TensorBoard is for training curves:
+
+```text
+http://SERVER_IP:6006/
+```
+
+Gradio is for inferred audio output:
+
+```text
+http://SERVER_IP:6007/
+```
+
+Run the Gradio app from repo root:
+
+```bash
+cd ~/cosyvoice-bengali-tts
+
+CUDA_VISIBLE_DEVICES=1 python webui.py \
+  --model_dir pretrained_models/Fun-CosyVoice3-0.5B-bengali-epoch104 \
+  --port 6007
+```
+
+Open:
+
+```text
+http://202.4.122.62:6007/
+```
+
+The Bengali web UI includes:
+
+- English and Bangla labels;
+- short description of input/output;
+- quick examples;
+- prepared-by footer;
+- prompt-audio upload;
+- cross-lingual and zero-shot modes.
+
+If browser audio upload fails, test terminal inference first. A Gradio upload failure can be caused by browser permissions, temporary disk issues, or server upload handling, while terminal inference can still work correctly.
+
+#### 12.7 WebUI Troubleshooting And Audio Formats
+
+**Audio Upload Permission Error (`/tmp/gradio`)**
+
+If you see this error when uploading audio:
+
+```text
+PermissionError: [Errno 13] Permission denied: '/tmp/gradio/...'
+```
+
+Set a custom temporary directory before starting the webui:
+
+```bash
+export GRADIO_TEMP_DIR=/home/kawshik/gradio_tmp
+mkdir -p /home/kawshik/gradio_tmp
+
+CUDA_VISIBLE_DEVICES=1 python webui.py \
+  --model_dir pretrained_models/Fun-CosyVoice3-0.5B-bengali-epoch104 \
+  --port 6007
+```
+
+**Audio Format Support**
+
+The webui automatically handles any audio format:
+
+- **WhatsApp voice notes** (OPUS) → auto-converted to 16kHz WAV
+- **MP3, M4A, FLAC, OGG** → auto-converted to 16kHz WAV  
+- **WAV files** → used directly if already 16kHz, otherwise resampled
+
+Upload any audio file - the webui will resample it to the required 16 kHz automatically.
+
+**WebUI Mode Instructions With `<|endofprompt|>`**
+
+The webui now includes examples for each mode:
+
+| Mode | Where `<|endofprompt|>` goes | Example |
+|------|---------------------------|---------|
+| **Zero-shot** | In **Prompt Text** field | `I am happy today.<\|endofprompt\|>` |
+| **Cross-lingual** | In **TTS Text** field | `You are a helpful assistant.<\|endofprompt\|>আজকের আবহাওয়া খুব সুন্দর।` |
+| **Instruct** | In **Instruction text** field | `Speak with a happy tone.<\|endofprompt\|>` |
+
+The webui automatically adds `You are a helpful assistant.<|endofprompt|>` if you don't include it yourself.
+
+#### 12.8 Command Syntax Rules
+
+Use hyphen argument names, not underscore names:
+
+```text
+Correct:   --prompt-wav --prompt-text --model-dir --output-dir
+Wrong:     --prompt_wav --prompt_text --model_dir --output_dir
+```
+
+For multi-line Bash commands, the backslash must be the final character on the line:
+
+```bash
+--prompt-wav ./asset/kawshik_prompt.wav \
+```
+
+Do not put a space after `\`:
+
+```bash
+--prompt-wav ./asset/kawshik_prompt.wav \ 
+```
+
+That breaks the command and can cause errors such as:
+
+```text
+--prompt_text: command not found
+infer_bengali.py: error: the following arguments are required: --prompt-wav
+```
+
+#### 12.8 When To Use `--text-frontend`
 
 The inference helper disables text frontend by default.
 
@@ -1173,24 +1524,13 @@ Use this default first:
 no --text-frontend flag
 ```
 
-Only try `--text-frontend` as an experiment if you specifically want CosyVoice's built-in frontend normalization:
-
-```bash
-python local/infer_bengali.py \
-  --model-dir ../../../pretrained_models/Fun-CosyVoice3-0.5B-Bengali-LLM \
-  --mode zero_shot \
-  --text "তার কথাগুলো শুনে বুঝলাম বয়সের তুলনায় সে মানসিকতায় অনেক বড় হয়ে গিয়েছে।" \
-  --prompt-wav /home/kawshik/bengali_prompt.wav \
-  --prompt-text "You are a helpful assistant.<|endofprompt|>প্রম্পট অডিওর বাংলা transcript এখানে লিখুন।" \
-  --text-frontend
-```
+Only try `--text-frontend` as an experiment if you specifically want CosyVoice's built-in frontend normalization.
 
 For the Bengali baseline, the recommended setting is still:
 
 ```text
 text_frontend=False
 ```
-
 ## 15. Common Failure Points
 
 ### Missing submodules
@@ -1340,6 +1680,172 @@ hash -r
 ```
 
 Then verify `which python` and `which python3` again before running `run.sh`.
+### Disk full while saving checkpoint
+
+Observed error:
+
+```text
+RuntimeError: PytorchStreamWriter failed writing file data/291: file write failed
+RuntimeError: unexpected pos ...
+```
+
+This means PyTorch failed while writing a checkpoint file. In the observed run, the actual cause was disk full, not a model bug.
+
+Observed disk status:
+
+```text
+df -h .
+/dev/sda5  2.7T total, 2.6T used, 371M available, 100% used
+```
+
+Inodes were fine:
+
+```text
+df -ih .
+IUse% 5%
+```
+
+So the issue was storage capacity, not inode exhaustion.
+
+Check storage:
+
+```bash
+cd ~/cosyvoice-bengali-tts/examples/bengali/cosyvoice3
+
+df -h .
+df -ih .
+du -sh data exp tensorboard 2>/dev/null
+find exp/cosyvoice3_bengali -type f -printf "%s %p\n" | sort -n | tail -20
+```
+
+Clean old checkpoints while keeping only epoch 100 and epoch 104:
+
+```bash
+cd ~/cosyvoice-bengali-tts/examples/bengali/cosyvoice3/exp/cosyvoice3_bengali/llm/torch_ddp
+
+find . -maxdepth 1 -type f -name "epoch_*_whole.pt" \
+  ! -name "epoch_100_whole.pt" \
+  ! -name "epoch_104_whole.pt" \
+  -print
+
+find . -maxdepth 1 -type f -name "epoch_*_whole.yaml" \
+  ! -name "epoch_100_whole.yaml" \
+  ! -name "epoch_104_whole.yaml" \
+  -print
+```
+
+If the printed list looks correct, delete them:
+
+```bash
+find . -maxdepth 1 -type f -name "epoch_*_whole.pt" \
+  ! -name "epoch_100_whole.pt" \
+  ! -name "epoch_104_whole.pt" \
+  -delete
+
+find . -maxdepth 1 -type f -name "epoch_*_whole.yaml" \
+  ! -name "epoch_100_whole.yaml" \
+  ! -name "epoch_104_whole.yaml" \
+  -delete
+```
+
+Optional if you only want to keep the two selected checkpoints:
+
+```bash
+rm -f init.pt init.yaml
+```
+
+Deleting old checkpoint files does **not** delete TensorBoard graphs. TensorBoard event files live under `tensorboard/`, not inside the `.pt` checkpoint files.
+
+### Training checkpoint is not a clean inference `llm.pt`
+
+A file like this:
+
+```text
+epoch_104_whole.pt
+```
+
+is a training checkpoint. It may contain:
+
+```text
+model weights
++ epoch
++ step
+```
+
+A clean inference `llm.pt` should contain only model weights. If the checkpoint is copied directly to `llm.pt`, web UI or terminal inference can fail with:
+
+```text
+Unexpected key(s) in state_dict: "epoch", "step".
+```
+
+Fix: export a clean `llm.pt` as shown in **Step 12.2 Prepare A Clean Fine-Tuned Model Directory**.
+
+### CosyVoice3 says `<|endofprompt|>` is missing
+
+Observed error:
+
+```text
+AssertionError: <|endofprompt|> not detected in CosyVoice3 text or prompt_text
+```
+
+CosyVoice3 expects the special separator:
+
+```text
+<|endofprompt|>
+```
+
+For cross-lingual mode, put it inside `--text` before the Bengali target sentence:
+
+```text
+You are a Bengali text-to-speech assistant. Speak clearly and naturally.<|endofprompt|>বাংলা বাক্য...
+```
+
+For zero-shot mode, put it inside `--prompt-text` before the prompt transcript:
+
+```text
+You are a helpful assistant.<|endofprompt|>prompt wav-এর exact transcript...
+```
+
+The updated Bengali helper and web UI add this automatically for CosyVoice3 when possible, but writing it manually is also valid.
+
+### Gradio upload fails but terminal inference works
+
+The Gradio page may show an HTTP 500 error during prompt-audio upload. This can be caused by browser upload handling, temporary disk space, server file permissions, or a nearly full filesystem.
+
+First prove the model works with terminal inference:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python examples/bengali/cosyvoice3/local/infer_bengali.py \
+  --model-dir pretrained_models/Fun-CosyVoice3-0.5B-bengali-epoch104 \
+  --mode cross_lingual \
+  --text "You are a Bengali text-to-speech assistant. Speak clearly and naturally.<|endofprompt|>আজ বিকেলে আকাশটা মেঘলা ছিল, কিন্তু ঠান্ডা বাতাসে হাঁটতে খুব ভালো লাগছিল।" \
+  --prompt-wav ./asset/kawshik_prompt.wav \
+  --output-dir inference_test/output_cross
+```
+
+If this creates a valid wav, the model and checkpoint are fine. Then debug Gradio upload separately.
+
+### Browser says no microphone found
+
+This only affects browser recording. It does not mean inference is broken.
+
+On a remote server, browser microphone access may fail because of HTTP, browser permissions, SSH/VS Code remote behavior, or missing client microphone forwarding.
+
+Recommended path:
+
+```text
+Record prompt audio separately -> upload the wav file -> run inference
+```
+
+### Zero-shot generated 0-second or broken output
+
+Zero-shot requires exact prompt alignment:
+
+```text
+prompt wav content == prompt text transcript
+```
+
+During testing, zero-shot reached the model but produced a broken/0-second output. Cross-lingual mode generated a valid ~9 second output and is the recommended current path for this checkpoint.
 ### `.flac` audio cannot be read
 
 Possible fixes:
@@ -1490,14 +1996,17 @@ Before running the full Bengali pipeline on the server, configure:
 
 ## 18. Known Limitations
 
-Current baseline limitations:
+Current baseline limitations and observations:
 
 - Bengali-specific text normalization is not yet advanced.
 - Bengali phoneme/G2P support is not planned for the first version.
 - `.flac` reading depends on the server audio backend.
-- Full CosyVoice3 fine-tuning may require significant GPU memory and time.
-- First audible Bengali output may not be clear until enough clean data and training time are used.
-- Inference flow after fine-tuning should be validated after the first checkpoint.
+- Full CosyVoice3 fine-tuning requires significant GPU memory, time, and storage.
+- LLM checkpoints are large, about 1.9 GB each in the observed run.
+- Saving every epoch is not practical for long runs; use `save_interval_epochs: 10` or another retention policy.
+- Zero-shot inference is sensitive to exact prompt transcript alignment and did not perform as reliably in the first test.
+- Cross-lingual inference is currently the verified working Bengali inference path.
+- The current fine-tuned inference model uses the Bengali LLM checkpoint with the original pretrained flow and vocoder.
 
 ## 19. Beginner Glossary Of CosyVoice Keywords
 
@@ -1773,16 +2282,3 @@ Software Engineer | Researcher
 Department of Computer Science and Engineering (CSE)  
 Bangladesh University of Engineering and Technology (BUET)  
 **Email:** kawshikbuet17@gmail.com  
-
-
-
-
-
-
-
-
-
-
-
-
-

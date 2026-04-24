@@ -1,4 +1,4 @@
-﻿# TTS and CosyVoice for Beginners: A Practical Starting Guide
+# TTS and CosyVoice for Beginners: A Practical Starting Guide
 
 This guide explains what CosyVoice is, how it fits into Text-to-Speech work, and how a beginner can approach this repository before making Bengali dataset-specific changes.
 
@@ -152,9 +152,20 @@ A short audio recording used to tell the model what speaker voice or style to im
 
 ### Speaker embedding
 
-A compact vector representation of a speaker's voice.
+A speaker embedding is a small numeric summary of a person's voice.
 
-CosyVoice uses speaker embeddings to help model speaker identity.
+Beginner intuition:
+
+```text
+speaker embedding = compact voice signature
+```
+
+It is not a full audio clip and it is not readable text. It stores voice characteristics such as timbre and speaker identity in a compressed form so CosyVoice can keep the generated voice closer to the reference speaker.
+
+Example:
+
+- if two prompt audios come from the same speaker, their speaker embeddings should be similar;
+- if the prompt audios come from very different speakers, their embeddings should be farther apart.
 
 ### Speech token
 
@@ -268,6 +279,50 @@ Final .wav speech audio
 ```
 
 The important point is that the LLM does not directly output `.wav` audio. It predicts an intermediate speech representation. The flow model and vocoder are still needed to create the final sound.
+
+### Beginner-friendly LLM input/output view
+
+Instead of thinking about the LLM in tensor shapes, a beginner can think about it like this.
+
+Input to the LLM:
+
+- the target text that should be spoken;
+- optional prompt text, mainly for zero-shot mode;
+- voice/style context coming from prompt audio;
+- system context such as `You are a helpful assistant.<|endofprompt|>` for CosyVoice3.
+
+Output from the LLM:
+
+- a sequence of speech tokens.
+
+Those speech tokens are not final audio yet. They are an internal speech representation. After the LLM predicts them, the flow/acoustic model and vocoder convert them into the final `.wav` speech audio.
+
+Reader-friendly example:
+
+```text
+Target text:
+আজকের সকালটা খুব শান্ত ছিল। নদীর পাশে হালকা বাতাস বইছিল।
+
+Prompt audio:
+A short reference recording from the speaker whose voice/style we want to follow.
+
+Prompt text:
+Used mainly in zero-shot mode. It should match the spoken content of the prompt audio.
+
+LLM output:
+An internal sequence of speech tokens representing how the sentence should sound.
+
+Final system output:
+A Bengali .wav audio file.
+```
+
+A very simple mental model is:
+
+```text
+text + prompt/context -> LLM -> speech tokens -> flow/vocoder -> final audio
+```
+
+So the LLM is not directly generating a playable wav file by itself. It is planning the speech sequence in a form that the rest of CosyVoice3 can synthesize.
 
 During inference, the LLM weights stay fixed. The model is only using what it has already learned to produce new speech-token sequences from new text.
 
@@ -717,6 +772,34 @@ The transcript is expected inside JSON:
 annotation[*]["sentence"]
 ```
 
+### Which raw Bengali dataset fields are actually used
+
+For the current Bengali CosyVoice preparation path, these raw dataset fields matter most.
+
+Required or effectively required:
+
+- one real `.flac` file for each usable utterance;
+- one matching `.json` file;
+- transcript text from `annotation[*]["sentence"]`;
+- `speaker_id`, or a folder structure from which the speaker ID can be inferred.
+
+Used when present:
+
+- `path`: used to help resolve the matching `.flac` file if it is not found by simple same-name matching;
+- `duration`: used for min/max duration filtering;
+- `speech_id`: used to build stable utterance naming when available;
+- `gender`: retained in prepared metadata/reporting, but not used as a training control signal.
+
+Present in the raw schema but not used for current training decisions:
+
+- `script_source`;
+- `annotation[*].tagList`;
+- `annotation[*].start` and `annotation[*].end`;
+- `annotation[*].id`;
+- `annotation[*].words[*]` word-level timing fields.
+
+So the current implementation mainly needs clean audio-text pairing plus speaker identity. The richer JSON structure is still valuable, but much of it is being kept for future extensions rather than the first Bengali baseline.
+
 The Bengali preparation script should:
 
 - recursively scan the dataset
@@ -824,6 +907,15 @@ Do not judge voice quality from the first few minutes.
 
 Goal: check whether Bengali speech generation improves.
 
+Practical finding from the first Bengali run:
+
+```text
+cross-lingual inference is the currently verified working path.
+zero-shot is documented but should be debugged separately because it needs exact prompt-text alignment.
+```
+
+Also remember that a training checkpoint such as `epoch_104_whole.pt` is not directly the same as inference `llm.pt`. Export a clean `llm.pt` first by removing training-only fields such as `epoch` and `step`, then use it inside a complete CosyVoice3 model folder.
+
 ---
 
 ## 19. Common beginner mistakes
@@ -913,7 +1005,20 @@ Short audio used to guide speaker identity or speaking style.
 
 ### Speaker embedding
 
-A vector representation of speaker identity.
+A speaker embedding is a small numeric summary of a person's voice.
+
+Beginner intuition:
+
+```text
+speaker embedding = compact voice signature
+```
+
+It is not a full audio clip and it is not readable text. It stores voice characteristics such as timbre and speaker identity in a compressed form so CosyVoice can keep the generated voice closer to the reference speaker.
+
+Example:
+
+- if two prompt audios come from the same speaker, their speaker embeddings should be similar;
+- if the prompt audios come from very different speakers, their embeddings should be farther apart.
 
 ### Speech token
 

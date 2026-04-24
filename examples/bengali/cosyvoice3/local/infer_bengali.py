@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Bengali inference helper for CosyVoice3.
 
 Run from examples/bengali/cosyvoice3, or from anywhere after installing the
@@ -20,7 +20,19 @@ import torchaudio  # noqa: E402
 
 
 DEFAULT_TEXT = "তার কথাগুলো শুনে বুঝলাম বয়সের তুলনায় সে মানসিকতায় অনেক বড় হয়ে গিয়েছে।"
+COSYVOICE3_SYSTEM_PROMPT = "You are a helpful assistant.<|endofprompt|>"
 DEFAULT_INSTRUCT = "You are a helpful assistant. Please speak in Bengali.<|endofprompt|>"
+
+
+def uses_cosyvoice3(model_dir):
+    return "cosyvoice3" in str(model_dir).lower()
+
+
+def ensure_cosyvoice3_prefix(text):
+    text = text.strip()
+    if "<|endofprompt|>" in text:
+        return text
+    return COSYVOICE3_SYSTEM_PROMPT + text
 
 
 def parse_args():
@@ -75,10 +87,21 @@ def main():
         fp16=args.fp16,
     )
 
+    tts_text = args.text
+    prompt_text = args.prompt_text
+    instruct_text = args.instruct_text
+    if uses_cosyvoice3(model_dir):
+        if args.mode == "zero_shot":
+            prompt_text = ensure_cosyvoice3_prefix(prompt_text)
+        elif args.mode == "cross_lingual":
+            tts_text = ensure_cosyvoice3_prefix(tts_text)
+        else:
+            instruct_text = ensure_cosyvoice3_prefix(instruct_text)
+
     if args.mode == "zero_shot":
         results = cosyvoice.inference_zero_shot(
-            args.text,
-            args.prompt_text,
+            tts_text,
+            prompt_text,
             str(prompt_wav),
             stream=args.stream,
             speed=args.speed,
@@ -86,7 +109,7 @@ def main():
         )
     elif args.mode == "cross_lingual":
         results = cosyvoice.inference_cross_lingual(
-            args.text,
+            tts_text,
             str(prompt_wav),
             stream=args.stream,
             speed=args.speed,
@@ -94,8 +117,8 @@ def main():
         )
     else:
         results = cosyvoice.inference_instruct2(
-            args.text,
-            args.instruct_text,
+            tts_text,
+            instruct_text,
             str(prompt_wav),
             stream=args.stream,
             speed=args.speed,

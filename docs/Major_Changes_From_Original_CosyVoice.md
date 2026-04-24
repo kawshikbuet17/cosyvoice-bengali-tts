@@ -7,9 +7,11 @@ The purpose of the fork is simple: keep the original CosyVoice3 model and traini
 Current status:
 
 ```text
-The Bengali CosyVoice3 scaffold has been added.
-It includes Bengali dataset preparation, a CosyVoice3 Bengali config, a staged run script, and Bengali-focused documentation.
-Full execution requires the real remote dataset and downloaded pretrained model files. After training starts, the next validation target is checkpoint-based Bengali inference.
+The Bengali CosyVoice3 scaffold has been added and executed on the remote dataset.
+The pipeline can prepare Bengali metadata, extract embeddings/tokens, build parquet files, and start LLM fine-tuning.
+A fine-tuned epoch_104 checkpoint was exported into a clean inference `llm.pt`.
+Cross-lingual Bengali inference is verified and generated a valid non-empty wav output.
+Zero-shot inference is documented but is not the recommended first inference path yet because it is sensitive to exact prompt transcript alignment.
 ```
 
 ## 1. What This Fork Adds
@@ -79,6 +81,7 @@ annotation[*]["sentence"]
 ```
 
 The Bengali data bridge converts this raw dataset into the CosyVoice metadata format.
+At high level, the current implementation mainly uses the transcript under `annotation[*]["sentence"]`, speaker identity, audio-path linkage, and optional `duration` / `speech_id` fields. Word-level timing data is kept in the schema example but is not yet used as a primary training signal.
 
 ## 3. CosyVoice3 First
 
@@ -104,8 +107,9 @@ The workflow is:
 4. Extract speech tokens.
 5. Generate parquet data.
 6. Start CosyVoice3 LLM fine-tuning.
-7. Test Bengali inference.
-8. Expand from a small subset to larger single-speaker or multi-speaker training.
+7. Manage large checkpoints and export a clean inference `llm.pt`.
+8. Test Bengali inference, currently verified through cross-lingual mode.
+9. Expand from a small subset to larger single-speaker or multi-speaker training.
 ```
 
 This keeps the implementation close to original CosyVoice and avoids unnecessary refactoring.
@@ -202,12 +206,12 @@ The Bengali changes should be a focused adaptation layer, not a broad rewrite.
 
 Recommended next actions:
 
-1. Test original CosyVoice3 inference on the server.
-2. Test Bengali data preparation on a tiny real subset.
-3. Run embedding, speech token, and parquet stages.
-4. Start LLM fine-tuning on one GPU.
-5. Test Bengali inference from the adapted checkpoint.
-6. Improve Bengali normalization and scaling after the first successful run.
+1. Keep cross-lingual inference as the verified Bengali audio-output path.
+2. Resume training from the latest good checkpoint after freeing disk space.
+3. Save checkpoints less frequently, for example every 10 epochs.
+4. Continue testing Gradio on port `6007` for manager/user audio review.
+5. Debug zero-shot separately after prompt transcript alignment is controlled.
+6. Improve Bengali normalization and scale training after stable inference is confirmed.
 
 ---
 
