@@ -8,6 +8,8 @@ For a beginner explanation of TTS and CosyVoice concepts, see [TTS_CosyVoice_Beg
 
 For a concise high-level summary of how this fork differs from original CosyVoice, see [Major_Changes_From_Original_CosyVoice.md](Major_Changes_From_Original_CosyVoice.md).
 
+For the separate emotion-tagged Bengali fine-tuning workflow, see [TTS_CosyVoice_Bengali_Emotion_Finetune_Guide.md](TTS_CosyVoice_Bengali_Emotion_Finetune_Guide.md).
+
 Important current status:
 
 ```text

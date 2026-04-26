@@ -6,6 +6,7 @@ Start here:
 
 - [TTS_CosyVoice_Beginner_Guide.md](docs/TTS_CosyVoice_Beginner_Guide.md)
 - [TTS_CosyVoice_Bengali_Implementation_Guide.md](docs/TTS_CosyVoice_Bengali_Implementation_Guide.md)
+- [TTS_CosyVoice_Bengali_Emotion_Finetune_Guide.md](docs/TTS_CosyVoice_Bengali_Emotion_Finetune_Guide.md)
 - [Major_Changes_From_Original_CosyVoice.md](docs/Major_Changes_From_Original_CosyVoice.md)
 
 The original upstream README continues below. For Bengali-specific work, use this fork and the documents linked above; upstream clone/install examples are kept as original CosyVoice reference material.
@@ -275,4 +276,3 @@ You can also scan the QR code to join our official Dingding chat group.
 
 ## Disclaimer
 The content provided above is for academic purposes only and is intended to demonstrate technical capabilities. Some examples are sourced from the internet. If any content infringes on your rights, please contact us to request its removal.
-

@@ -12,6 +12,7 @@ The pipeline can prepare Bengali metadata, extract embeddings/tokens, build parq
 A fine-tuned epoch_104 checkpoint was exported into a clean inference `llm.pt`.
 Cross-lingual Bengali inference is verified and generated a valid non-empty wav output.
 Zero-shot inference is documented but is not the recommended first inference path yet because it is sensitive to exact prompt transcript alignment.
+An additional Bengali emotion fine-tuning workflow is now scaffolded for a tag-annotated .txt + .wav dataset.
 ```
 
 ## 1. What This Fork Adds

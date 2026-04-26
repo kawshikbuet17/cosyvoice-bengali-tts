@@ -28,6 +28,19 @@ from cosyvoice.cli.cosyvoice import AutoModel
 from cosyvoice.utils.file_utils import logging
 from cosyvoice.utils.common import set_all_random_seed
 
+# Import emotion tag conversion for Bengali fine-tuned models
+sys.path.insert(0, os.path.join(ROOT_DIR, 'examples', 'bengali', 'cosyvoice3_emotion', 'local'))
+try:
+    from emotion_tags import (
+        DEFAULT_BASE_INSTRUCTION,
+        DEFAULT_NEUTRAL_INSTRUCTION,
+        convert_tagged_text,
+        ensure_cosyvoice3_prefix as emotion_ensure_prefix,
+    )
+    EMOTION_TAGS_AVAILABLE = True
+except ImportError:
+    EMOTION_TAGS_AVAILABLE = False
+
 MODE_SFT = 'Pretrained voice / প্রিট্রেইনড ভয়েস'
 MODE_ZERO_SHOT = 'Zero-shot voice clone / জিরো-শট ভয়েস ক্লোন'
 MODE_CROSS_LINGUAL = 'Cross-lingual voice clone / ক্রস-লিঙ্গুয়াল ভয়েস ক্লোন'
@@ -62,16 +75,18 @@ instruct_dict = {
     MODE_CROSS_LINGUAL: (
         'English:\n'
         '1. Enter the target text to synthesize. Bengali text is supported for testing.\n'
-        '2. Use one instruction prefix such as You are a helpful assistant.<|endofprompt|> before the Bengali sentence.\n'
-        '3. Upload or record prompt audio for the reference voice.\n'
-        '4. Prompt Text is not required for this mode.\n'
-        '5. Click Generate Audio.\n\n'
+        '2. Use one instruction prefix such as Speak warmly. Speak with a smile.<|endofprompt|> before the Bengali sentence.\n'
+        '3. OR use emotion tags shorthand: [warm][smile] Your Bengali text here\n'
+        '4. Upload or record prompt audio for the reference voice.\n'
+        '5. Prompt Text is not required for this mode.\n'
+        '6. Click Generate Audio.\n\n'
         'বাংলা:\n'
         '১. যে টেক্সট থেকে অডিও বানাতে চান সেটি লিখুন। বাংলা টেক্সট দিয়ে পরীক্ষা করা যাবে।\n'
-        '২. বাংলা বাক্যের আগে একটি instruction prefix যেমন You are a helpful assistant.<|endofprompt|> ব্যবহার করুন।\n'
-        '৩. রেফারেন্স ভয়েসের জন্য prompt audio আপলোড বা রেকর্ড করুন।\n'
-        '৪. এই মোডে Prompt Text দরকার হয় না।\n'
-        '৫. Generate Audio বাটনে ক্লিক করুন।'
+        '২. বাংলা বাক্যের আগে একটি instruction prefix যেমন Speak warmly. Speak with a smile.<|endofprompt|> ব্যবহার করুন।\n'
+        '৩. অথবা emotion tag shorthand ব্যবহার করুন: [warm][smile] আপনার বাংলা টেক্সট\n'
+        '৪. রেফারেন্স ভয়েসের জন্য prompt audio আপলোড বা রেকর্ড করুন।\n'
+        '৫. এই মোডে Prompt Text দরকার হয় না।\n'
+        '৬. Generate Audio বাটনে ক্লিক করুন।'
     ),
     MODE_INSTRUCT: (
         'English:\n'
@@ -79,13 +94,15 @@ instruct_dict = {
         '2. Enter an instruction such as speaking style or emotion.\n'
         '3. Use at most one <|endofprompt|> token in the instruction.\n'
         '4. Enter the text to synthesize.\n'
-        '5. Click Generate Audio.\n\n'
+        '5. OR use emotion tags shorthand in text: [warm][smile] Your Bengali text\n'
+        '6. Click Generate Audio.\n\n'
         'বাংলা:\n'
         '১. প্রিট্রেইনড স্পিকার/ভয়েস থাকলে নির্বাচন করুন।\n'
         '২. কথা বলার স্টাইল বা emotion নির্দেশনা হিসেবে লিখুন।\n'
         '৩. নির্দেশনায় সর্বোচ্চ একটি <|endofprompt|> ব্যবহার করুন।\n'
         '৪. যে লেখা থেকে অডিও বানাতে চান সেটি লিখুন।\n'
-        '৫. Generate Audio বাটনে ক্লিক করুন।'
+        '৫. অথবা emotion tags shorthand ব্যবহার করুন: [warm][smile] আপনার বাংলা টেক্সট\n'
+        '৬. Generate Audio বাটনে ক্লিক করুন।'
     )
 }
 stream_mode_list = [('No / না', False), ('Yes / হ্যাঁ', True)]
@@ -103,6 +120,52 @@ def ensure_cosyvoice3_prefix(text):
     if '<|endofprompt|>' in text:
         return text
     return COSYVOICE3_SYSTEM_PROMPT + text
+
+
+def has_emotion_tags(text):
+    """Check if text starts with emotion tags like [warm][smile]."""
+    if not text:
+        return False
+    import re
+    return bool(re.match(r'^\s*(\[[^\[\]]+\]\s*)+', text))
+
+
+def prepare_emotion_inputs(raw_text, instruct_text, mode):
+    """Prepare inputs with emotion tag conversion for CosyVoice3.
+    
+    Returns: (tts_text, instruct_text, conversion_info)
+    """
+    if not EMOTION_TAGS_AVAILABLE:
+        # Fallback: just ensure prefix if cosyvoice3
+        if uses_cosyvoice3() and mode == MODE_CROSS_LINGUAL:
+            return ensure_cosyvoice3_prefix(raw_text), instruct_text, None
+        return raw_text, instruct_text, None
+    
+    converted = convert_tagged_text(raw_text, base_instruction=DEFAULT_BASE_INSTRUCTION)
+    clean_text = converted["text"] or (raw_text or "").strip()
+    
+    if mode == MODE_CROSS_LINGUAL:
+        if converted["tags"]:
+            # Tags found: convert to cross-lingual format with instruction prefix
+            tts_text = converted["instruction"] + clean_text
+            return tts_text, instruct_text, converted
+        else:
+            # No tags: just ensure CosyVoice3 prefix
+            return ensure_cosyvoice3_prefix(clean_text), instruct_text, converted
+    
+    elif mode == MODE_INSTRUCT:
+        if instruct_text.strip():
+            # Explicit instruction provided: use it
+            return clean_text, ensure_cosyvoice3_prefix(instruct_text.strip()), converted
+        elif converted["tags"]:
+            # No explicit instruction but tags found: convert tags to instruction
+            return clean_text, converted["instruction"], converted
+        else:
+            # No tags, no explicit instruction: use base instruction
+            return clean_text, emotion_ensure_prefix(DEFAULT_NEUTRAL_INSTRUCTION), converted
+    
+    # Other modes: return clean text
+    return clean_text, instruct_text, converted
 
 
 def count_endofprompt(text):
@@ -136,7 +199,7 @@ def change_mode_ui(mode):
         instruct_placeholder = 'Not used in cross-lingual mode. / Cross-lingual মোডে এটি ব্যবহার হয় না।'
     elif mode == MODE_INSTRUCT:
         prompt_placeholder = 'Not used in instruction mode. / Instruction মোডে এটি ব্যবহার হয় না।'
-        instruct_placeholder = 'Example: Speak calmly and clearly.<|endofprompt|> / উদাহরণ: শান্তভাবে এবং পরিষ্কারভাবে বলুন।<|endofprompt|>'
+        instruct_placeholder = 'Example: Speak warmly. Speak with a smile.<|endofprompt|> / উদাহরণ: উষ্ণভাবে এবং হাসিমুখে বলুন।<|endofprompt|>'
     else:
         prompt_placeholder = 'Not used in pretrained voice mode. / Pretrained voice মোডে এটি ব্যবহার হয় না।'
         instruct_placeholder = 'Not used in pretrained voice mode. / Pretrained voice মোডে এটি ব্যবহার হয় না।'
@@ -302,7 +365,17 @@ def generate_audio(tts_text, mode_checkbox_group, sft_dropdown, prompt_text, pro
         if instruct_text != '':
             gr.Info('Zero-shot mode ignores pretrained voice and instruction text. / Zero-shot মোডে pretrained voice ও instruction text ব্যবহার হয় না।')
 
-    if uses_cosyvoice3():
+    # Apply emotion tag conversion and CosyVoice3 prefix handling
+    conversion_info = None
+    if EMOTION_TAGS_AVAILABLE and has_emotion_tags(tts_text):
+        # Text has emotion tags - use conversion
+        tts_text, instruct_text, conversion_info = prepare_emotion_inputs(
+            tts_text, instruct_text, mode_checkbox_group
+        )
+        if conversion_info and conversion_info.get("unsupported_tags"):
+            gr.Info("Ignored unsupported emotion tags: {}".format(", ".join(conversion_info["unsupported_tags"])))
+    elif uses_cosyvoice3():
+        # No emotion tags, just apply CosyVoice3 prefix where needed
         if mode_checkbox_group == MODE_ZERO_SHOT:
             prompt_text = ensure_cosyvoice3_prefix(prompt_text)
         elif mode_checkbox_group == MODE_CROSS_LINGUAL:
@@ -390,7 +463,7 @@ def main():
 
             **Cross-lingual text example / Cross-lingual টেক্সট উদাহরণ**
             ```text
-            You are a helpful assistant.<|endofprompt|>আজকের সকালটা খুব শান্ত ছিল। নদীর পাশে হালকা বাতাস বইছিল।
+            Speak warmly. Speak with a smile.<|endofprompt|>আজকের সকালটা খুব শান্ত ছিল। নদীর পাশে হালকা বাতাস বইছিল।
             ```
 
             **Zero-shot prompt text example / Zero-shot prompt text উদাহরণ**
@@ -402,6 +475,19 @@ def main():
             ```text
             Speak calmly and clearly.<|endofprompt|>
             ```
+
+            **Emotion tags example (Cross-lingual) / Emotion tag উদাহরণ (Cross-lingual)**
+            ```text
+            [warm][smile] জি, প্রি-অর্ডার সম্পর্কে বলে দিচ্ছি। কোন পণ্যটি নিতে চান বলুন।
+            ```
+
+            **Emotion tags example (Instruction mode) / Emotion tag উদাহরণ (Instruction মোড)**
+            ```text
+            [angry][loud] অর্ডার নম্বর ছাড়া আমি এখনই অর্ডারটা খুঁজে দিতে পারছি না।
+            ```
+
+            **Supported emotion tags / সমর্থিত emotion tags:**
+            `[warm]`, `[smile]`, `[angry]`, `[sad]`, `[happy]`, `[pause]`, `[laugh]`, `[soft]`, `[loud]`, `[fast]`, `[slow]`, `[clear]`, `[gentle]`, `[calming]`, `[empathetic]`, এবং আরও অনেক।
 
             **Important / গুরুত্বপূর্ণ:** Use only one `<|endofprompt|>` token in the relevant field. / সংশ্লিষ্ট ফিল্ডে শুধুমাত্র একটি `<|endofprompt|>` ব্যবহার করুন।
             """
