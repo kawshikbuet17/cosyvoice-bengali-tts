@@ -199,7 +199,7 @@ def change_mode_ui(mode):
         instruct_placeholder = 'Not used in cross-lingual mode. / Cross-lingual মোডে এটি ব্যবহার হয় না।'
     elif mode == MODE_INSTRUCT:
         prompt_placeholder = 'Not used in instruction mode. / Instruction মোডে এটি ব্যবহার হয় না।'
-        instruct_placeholder = 'Example: Speak warmly. Speak with a smile.<|endofprompt|> / উদাহরণ: উষ্ণভাবে এবং হাসিমুখে বলুন।<|endofprompt|>'
+        instruct_placeholder = 'Example: Speak gently. Speak with a smile.<|endofprompt|> / উদাহরণ: নরমভাবে এবং হাসিমুখে বলুন।<|endofprompt|>'
     else:
         prompt_placeholder = 'Not used in pretrained voice mode. / Pretrained voice মোডে এটি ব্যবহার হয় না।'
         instruct_placeholder = 'Not used in pretrained voice mode. / Pretrained voice মোডে এটি ব্যবহার হয় না।'
@@ -459,35 +459,31 @@ def main():
 
         gr.Markdown(
             """
-            **Copy-paste examples / কপি-পেস্ট উদাহরণ:**
+            **Copy-paste test set examples / টেস্ট সেট উদাহরণ (কপি-পেস্ট করুন):**
 
-            **Cross-lingual text example / Cross-lingual টেক্সট উদাহরণ**
             ```text
-            Speak warmly. Speak with a smile.<|endofprompt|>আজকের সকালটা খুব শান্ত ছিল। নদীর পাশে হালকা বাতাস বইছিল।
+            আমি বুঝতে পারছি, ডেলিভারি পার্টনার যোগাযোগ না করায় আপনি অসুবিধায় পড়েছেন।
+            পেমেন্ট সমস্যার জন্য আমরা দুঃখিত।
+            অনুগ্রহ করে পণ্যের ছবি বা ভিডিও এবং অর্ডার আইডি শেয়ার করুন।
+            আপনি কোন ক্যাটাগরির পণ্য নিতে চান, সেটি বললে আমি আরও নির্দিষ্টভাবে সাহায্য করতে পারব।
+            অনুগ্রহ করে আপনার রেজিস্টার্ড মোবাইল নম্বর বা ইমেইল দিন।
+            অনুগ্রহ করে পণ্যের মেয়াদ, প্যাকেটের ছবি এবং অর্ডার আইডি পাঠান।
+            আমি বুঝতে পারছি, অর্ডার কোথায় আছে তা জানা আপনার জন্য জরুরি।
+            উচ্চমূল্যের কিছু পণ্যের ক্ষেত্রে আংশিক পেমেন্ট সুবিধা থাকতে পারে।
+            অপশনটি পাওয়া গেলে আপনি ডেলিভারির সময় টাকা পরিশোধ করতে পারবেন।
+            আপনার অর্ডারের বিস্তারিত দেখতে অনুগ্রহ করে নিবন্ধিত মোবাইল নম্বরটি নিশ্চিত করুন।
+            আপডেট পাওয়া মাত্র আমি আপনাকে সম্ভাব্য ডেলিভারি সময় জানিয়ে দিচ্ছি।
+            দুঃখিত, এই মুহূর্তে পণ্যটি স্টকে নাও থাকতে পারে।
+            তথ্য যাচাই হলে আমি আপনাকে বর্তমান স্ট্যাটাস জানিয়ে দিচ্ছি।
+            আমি পণ্যের প্রি-অর্ডার স্ট্যাটাস দেখে আপনাকে বিস্তারিত জানাচ্ছি।
+            আপনার ঠিকানা নিশ্চিত হলে আমি আপনাকে দ্রুততম ডেলিভারি অপশন জানিয়ে দিচ্ছি।
+            আমি আপনার রিটার্ন অনুরোধটি নোট করছি।
+            আমি বুঝতে পারছি, ভুল পণ্য পাওয়া আপনার জন্য বিরক্তিকর।
+            আমরা যাচাই করে আপনাকে লগইন বা পাসওয়ার্ড রিসেট প্রক্রিয়ায় সহায়তা করব।
             ```
 
-            **Zero-shot prompt text example / Zero-shot prompt text উদাহরণ**
-            ```text
-            You are a helpful assistant.<|endofprompt|>এটা একটা নমুনা ভয়েস। আমি আজকে খুব ভালো আছি।
-            ```
-
-            **Instruction text example / Instruction text উদাহরণ**
-            ```text
-            Speak calmly and clearly.<|endofprompt|>
-            ```
-
-            **Emotion tags example (Cross-lingual) / Emotion tag উদাহরণ (Cross-lingual)**
-            ```text
-            [warm][smile] জি, প্রি-অর্ডার সম্পর্কে বলে দিচ্ছি। কোন পণ্যটি নিতে চান বলুন।
-            ```
-
-            **Emotion tags example (Instruction mode) / Emotion tag উদাহরণ (Instruction মোড)**
-            ```text
-            [angry][loud] অর্ডার নম্বর ছাড়া আমি এখনই অর্ডারটা খুঁজে দিতে পারছি না।
-            ```
-
-            **Supported emotion tags / সমর্থিত emotion tags:**
-            `[warm]`, `[smile]`, `[angry]`, `[sad]`, `[happy]`, `[pause]`, `[laugh]`, `[soft]`, `[loud]`, `[fast]`, `[slow]`, `[clear]`, `[gentle]`, `[calming]`, `[empathetic]`, এবং আরও অনেক।
+            **Supported emotion tags / সমর্থিত emotion tags (4 only):**
+            `[gentle]`, `[smile]`, `[empathetic]`, `[apologetic]`
 
             **Important / গুরুত্বপূর্ণ:** Use only one `<|endofprompt|>` token in the relevant field. / সংশ্লিষ্ট ফিল্ডে শুধুমাত্র একটি `<|endofprompt|>` ব্যবহার করুন।
             """

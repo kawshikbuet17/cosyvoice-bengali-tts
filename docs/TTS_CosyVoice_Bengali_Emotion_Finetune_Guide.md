@@ -1,6 +1,6 @@
 # TTS CosyVoice Bengali Emotion Fine-Tune Guide
 
-This guide explains how to fine-tune CosyVoice3 for **emotion-aware Bengali speech** using a Bengali dataset whose text files contain whole-line style tags such as `[warm]`, `[smile]`, `[pause]`, and `[angry]`.
+This guide explains how to fine-tune CosyVoice3 for **emotion-aware Bengali speech** using a Bengali dataset whose text files contain whole-line style tags such as `[gentle]`, `[smile]`, `[empathetic]`, and `[apologetic]`.
 
 This workflow is separate from the raw Bengali `.flac + .json` workflow described in [TTS_CosyVoice_Bengali_Implementation_Guide.md](TTS_CosyVoice_Bengali_Implementation_Guide.md).
 
@@ -52,7 +52,7 @@ So the core instruction mechanism already exists.
 Even though CosyVoice3 already supports instruction-style prompting, fine-tuning is still needed here because:
 
 - the Bengali checkpoint should learn this dataset's own delivery style more reliably;
-- the dataset uses custom shorthand tags such as `[warm][smile]`, which are not native CosyVoice3 instruction strings;
+- the dataset uses custom shorthand tags such as `[gentle][smile]`, which are not native CosyVoice3 instruction strings;
 - the earlier Bengali training flow did not contain explicit emotion labels, so emotion/style was only learned implicitly from audio;
 - this workflow should make expressive Bengali delivery **more controllable**, not just occasionally emotional by chance.
 
@@ -89,11 +89,11 @@ Example:
 Example text contents:
 
 ```text
-[pause]অবশ্যই! অর্ডার নম্বরটা বলবেন, অথবা রেজিস্টার্ড ফোন নম্বরটা দিন।
+[gentle]অবশ্যই! অর্ডার নম্বরটা বলবেন, অথবা রেজিস্টার্ড ফোন নম্বরটা দিন।
 ```
 
 ```text
-[warm][smile] জি, প্রি-অর্ডার সম্পর্কে বলে দিচ্ছি। কোন পণ্যটি নিতে চান বলুন।
+[gentle][smile] জি, প্রি-অর্ডার সম্পর্কে বলে দিচ্ছি। কোন পণ্যটি নিতে চান বলুন।
 ```
 
 What is used from this dataset:
@@ -123,7 +123,7 @@ The first implementation supports **whole-line tags only**.
 Supported input:
 
 ```text
-[warm][smile] জি, প্রি-অর্ডার সম্পর্কে বলে দিচ্ছি।
+[gentle][smile] জি, প্রি-অর্ডার সম্পর্কে বলে দিচ্ছি।
 ```
 
 Converted output:
@@ -133,40 +133,34 @@ text:
 জি, প্রি-অর্ডার সম্পর্কে বলে দিচ্ছি।
 
 instruct:
-You are a helpful assistant. Speak in natural Bengali. Speak warmly. Speak with a smile.<|endofprompt|>
+Speak gently. Speak with a smile.<|endofprompt|>
 ```
 
 This means:
 
-- `[warm][smile]` is the dataset shorthand;
+- `[gentle][smile]` is the dataset shorthand;
 - CosyVoice3 training and inference still use instruction text with `<|endofprompt|>`;
 - the new adapter layer converts one format into the other.
 
-Initial supported tag mappings include:
+**Supported emotion tags (4 only for customer care voicebot):**
 
-- `[warm]` -> `Speak warmly.`
-- `[smile]` -> `Speak with a smile.`
-- `[pause]` -> `Pause briefly before speaking.`
-- `[angry]` -> `Speak angrily.`
-- `[sad]` -> `Speak sadly.`
-- `[laugh]` / `[laughter]` -> `Include light laughter.`
-- `[neutral]` -> `Speak neutrally.`
+| Tag | Instruction | When to Use |
+|-----|-------------|-------------|
+| `[gentle]` | `Speak gently.` | Default professional tone for greetings and general queries |
+| `[smile]` | `Speak with a smile.` | Positive, friendly moments and good news |
+| `[empathetic]` | `Speak empathetically.` | When customer has problems or complaints |
+| `[apologetic]` | `Speak apologetically.` | Service failures, delays, or mistakes |
 
-Some additional dataset-specific tags are also mapped, for example:
+**Examples:**
 
-- `[clear]`
-- `[serious]`
-- `[gentle]`
-- `[reassuring]`
-- `[calming]`
-- `[welcoming]`
-- `[informative]`
-- `[empathetic]`
-- `[polite]`
-- `[appreciative]`
-- `[confidently]`
+```text
+[gentle] শুভ সন্ধ্যা, আমি কিভাবে আপনাকে সাহায্য করতে পারি?
+[smile] চমৎকার! আপনার সমস্যার সমাধান হয়ে গেছে।
+[empathetic] আমি বুঝতে পারছি এটা আপনার জন্য কত কঠিন।
+[apologetic] দুঃখিত, এই সমস্যার জন্য আমরা আন্তরিকভাবে দুঃখিত।
+```
 
-Unsupported tags are logged and ignored in v1.
+Unsupported tags are logged and ignored.
 
 ## 6. Files Added For This Workflow
 
@@ -446,7 +440,7 @@ This is the easiest first expressive inference smoke test because the earlier Be
 CUDA_VISIBLE_DEVICES=1 python examples/bengali/cosyvoice3_emotion/local/infer_bengali_emotion.py \
   --model-dir pretrained_models/Fun-CosyVoice3-0.5B-bengali-epoch180 \
   --mode cross_lingual \
-  --text "[warm][smile] জি, প্রি-অর্ডার সম্পর্কে বলে দিচ্ছি। কোন পণ্যটি নিতে চান বলুন।" \
+  --text "[gentle][smile] জি, প্রি-অর্ডার সম্পর্কে বলে দিচ্ছি। কোন পণ্যটি নিতে চান বলুন।" \
   --prompt-wav ./asset/kawshik_prompt.wav \
   --output-dir inference_test/emotion_cross
 ```
@@ -471,7 +465,7 @@ CUDA_VISIBLE_DEVICES=1 python examples/bengali/cosyvoice3_emotion/local/infer_be
 CUDA_VISIBLE_DEVICES=1 python examples/bengali/cosyvoice3_emotion/local/infer_bengali_emotion.py \
   --model-dir pretrained_models/Fun-CosyVoice3-0.5B-bengali-epoch180 \
   --mode instruct2 \
-  --text "[angry] অর্ডার নম্বর ছাড়া আমি এখনই অর্ডারটা খুঁজে দিতে পারছি না।" \
+  --text "[apologetic] দুঃখিত, আপনার অর্ডার নম্বরটি আমার কাছে পাওয়া যাচ্ছে না।" \
   --prompt-wav ./asset/kawshik_prompt.wav \
   --output-dir inference_test/emotion_tags
 ```
@@ -510,7 +504,7 @@ Recommended Gradio path for this workflow:
 - upload prompt audio;
 - paste either:
   - a normal instruction-style input such as `You are a helpful assistant.<|endofprompt|>আজকের সকালটা খুব শান্ত ছিল।`; or
-  - a tag-style input such as `[warm][smile] জি, প্রি-অর্ডার সম্পর্কে বলে দিচ্ছি। কোন পণ্যটি নিতে চান বলুন।`
+  - a tag-style input such as `[gentle][smile] জি, প্রি-অর্ডার সম্পর্কে বলে দিচ্ছি। কোন পণ্যটি নিতে চান বলুন।`
 
 Current Gradio behavior for this workflow:
 
@@ -539,7 +533,7 @@ The converted instruction string.
 Example:
 
 ```text
-emotion_male_00527bc1_39f7_47fb_89e4_1c89a911904b_male You are a helpful assistant. Speak in natural Bengali. Speak warmly. Speak with a smile.<|endofprompt|>
+emotion_male_00527bc1_39f7_47fb_89e4_1c89a911904b_male Speak gently. Speak with a smile.<|endofprompt|>
 ```
 
 This is the key difference from the earlier Bengali workflow, which wrote the same generic `instruct` string for every utterance.
@@ -549,7 +543,7 @@ This is the key difference from the earlier Bengali workflow, which wrote the sa
 The first implementation intentionally keeps the scope narrow:
 
 - only **leading whole-line tags** are supported;
-- `[warm][smile] sentence` is supported;
+- `[gentle][smile] sentence` is supported;
 - `[emotion1]sentence1. [emotion2]sentence2.` is **not** supported in v1;
 - unsupported tags are ignored and reported;
 - the workflow uses existing CosyVoice3 instruction conditioning rather than introducing new tokenizer special tokens for dataset-specific tags.
