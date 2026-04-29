@@ -15,6 +15,7 @@ import os
 import sys
 import argparse
 import random
+import time
 
 import gradio as gr
 import numpy as np
@@ -188,8 +189,8 @@ def change_mode_ui(mode):
     instruct_enabled = mode == MODE_INSTRUCT
     instruct_visible = mode == MODE_INSTRUCT
     sft_visible = mode in [MODE_SFT, MODE_INSTRUCT]
-    stream_enabled = mode in [MODE_SFT, MODE_INSTRUCT]
-    stream_visible = mode in [MODE_SFT, MODE_INSTRUCT]
+    stream_enabled = True  # On/Off for all modes
+    stream_visible = True  # Visible for all modes
 
     if mode == MODE_ZERO_SHOT:
         prompt_placeholder = 'Write exactly what is spoken in the prompt audio. / Prompt audio-তে যা বলা হয়েছে ঠিক সেটি লিখুন।'
@@ -232,7 +233,7 @@ def change_mode_ui(mode):
     if not instruct_enabled:
         instruct_text_update['value'] = ''
 
-    stream_update = {'interactive': stream_enabled, 'visible': stream_visible, 'value': False}
+    stream_update = {'interactive': stream_enabled, 'visible': stream_visible}
 
     return (
         gr.update(value=instruct_dict[mode]),
@@ -275,7 +276,7 @@ def prepare_prompt_audio(prompt_wav):
 
 
 def clear_audio_output():
-    return None
+    return None, ''
 
 
 def build_audio_response(speech_data):
@@ -312,8 +313,7 @@ def generate_audio(tts_text, mode_checkbox_group, sft_dropdown, prompt_text, pro
         return (cosyvoice.sample_rate, default_data)
 
     if mode_checkbox_group in [MODE_ZERO_SHOT, MODE_CROSS_LINGUAL] and stream:
-        gr.Info('Streaming is disabled for zero-shot and cross-lingual modes to reduce short-output failures. / ছোট আউটপুটজনিত সমস্যা কমাতে zero-shot ও cross-lingual মোডে streaming বন্ধ রাখা হয়েছে।')
-        stream = False
+        gr.Warning('Streaming in zero-shot/cross-lingual may cause short audio. / Zero-shot/cross-lingual-এ streaming ছোট অডিও তৈরি করতে পারে।')
 
     prompt_info = None
     prompt_duration_seconds = None
@@ -383,6 +383,7 @@ def generate_audio(tts_text, mode_checkbox_group, sft_dropdown, prompt_text, pro
         elif mode_checkbox_group == MODE_INSTRUCT:
             instruct_text = ensure_cosyvoice3_prefix(instruct_text)
 
+    start_time = time.time()
     try:
         last_speech = None
         if mode_checkbox_group == MODE_SFT:
@@ -406,21 +407,23 @@ def generate_audio(tts_text, mode_checkbox_group, sft_dropdown, prompt_text, pro
             for item in cosyvoice.inference_instruct2(tts_text, instruct_text, prompt_wav, stream=stream, speed=speed):
                 last_speech = item['tts_speech'].numpy().flatten()
 
+        elapsed = time.time() - start_time
         if last_speech is None:
             gr.Warning(
                 'No audio was generated. Try a longer sentence or a clearer prompt audio. / '
                 'কোনো অডিও তৈরি হয়নি। আরও বড় বাক্য বা আরও পরিষ্কার prompt audio দিয়ে চেষ্টা করুন।'
             )
-            return (cosyvoice.sample_rate, default_data)
+            return (cosyvoice.sample_rate, default_data), f"Failed / ব্যর্থ: {elapsed:.2f}s"
 
-        return build_audio_response(last_speech)
+        return build_audio_response(last_speech), f"Generated in / তৈরি সময়: {elapsed:.2f}s"
     except Exception:
+        elapsed = time.time() - start_time
         logging.exception('Inference failed')
         gr.Warning(
             'Inference failed. Try a longer sentence, a clearer prompt audio, or cross-lingual mode with streaming off. / '
             'ইনফারেন্স ব্যর্থ হয়েছে। আরও বড় বাক্য, পরিষ্কার prompt audio, অথবা cross-lingual mode-এ streaming বন্ধ করে চেষ্টা করুন।'
         )
-        return (cosyvoice.sample_rate, default_data)
+        return (cosyvoice.sample_rate, default_data), f"Failed / ব্যর্থ: {elapsed:.2f}s"
 
 
 def main():
@@ -516,8 +519,8 @@ def main():
                 choices=stream_mode_list,
                 label='Streaming inference / স্ট্রিমিং ইনফারেন্স',
                 value=stream_mode_list[0][1],
-                interactive=False,
-                visible=False
+                interactive=True,
+                visible=True
             )
             speed = gr.Number(
                 value=1,
@@ -559,7 +562,9 @@ def main():
         )
 
         generate_button = gr.Button('Generate Audio / অডিও তৈরি করুন')
-        audio_output = gr.Audio(label='Generated audio / তৈরি অডিও', autoplay=True, streaming=False)
+        with gr.Row():
+            audio_output = gr.Audio(label='Generated audio / তৈরি অডিও', autoplay=True, streaming=False, scale=3)
+            time_output = gr.Text(label='Inference time / ইনফারেন্স সময়', value='', interactive=False, scale=1)
 
         gr.Markdown(
             """
@@ -576,7 +581,7 @@ def main():
         generate_button.click(
             clear_audio_output,
             inputs=[],
-            outputs=[audio_output],
+            outputs=[audio_output, time_output],
             queue=False
         ).then(
             generate_audio,
@@ -584,7 +589,7 @@ def main():
                 tts_text, mode_checkbox_group, sft_dropdown, prompt_text, prompt_wav_upload,
                 prompt_wav_record, instruct_text, seed, stream, speed
             ],
-            outputs=[audio_output]
+            outputs=[audio_output, time_output]
         )
         mode_checkbox_group.change(
             fn=change_mode_ui,
